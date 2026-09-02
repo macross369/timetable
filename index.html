@@ -205,22 +205,27 @@
 
         <!-- Subject Selection Area -->
         <div class="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
-          <div class="flex items-center justify-between mb-3.5 pb-2.5 border-b border-slate-100">
+          <div class="mb-3.5 pb-3 border-b border-slate-100 space-y-2.5">
+            <!-- Header Title: Standalone on its own line -->
             <div class="flex items-center space-x-2">
-              <i data-lucide="palette" class="w-5 h-5 text-indigo-600"></i>
-              <h3 class="font-bold text-slate-800 text-base">領域選擇區</h3>
+              <i data-lucide="palette" class="w-5 h-5 text-indigo-600 shrink-0"></i>
+              <h3 class="font-bold text-slate-800 text-base whitespace-nowrap">領域選擇區</h3>
             </div>
-            <div class="flex items-center space-x-1.5">
-              <button id="btn-toggle-delete-mode" title="點擊切換進入刪除領域模式" class="px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors border border-rose-200 flex items-center space-x-1">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                <span id="delete-mode-text">刪除領域按鈕</span>
+            
+            <!-- Three Action Buttons Row: Placed directly below the title, full width with no text wrapping -->
+            <div class="flex items-center space-x-2 w-full pt-0.5">
+              <button id="btn-toggle-delete-mode" title="點擊切換進入刪除領域模式" class="flex-1 py-1.5 px-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors border border-rose-200 flex items-center justify-center space-x-1 whitespace-nowrap shadow-xs cursor-pointer">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0"></i>
+                <span id="delete-mode-text" class="whitespace-nowrap">刪除領域按鈕</span>
               </button>
-              <button id="btn-reset-subjects" title="恢復預設領域" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+
+              <button id="btn-reset-subjects" title="恢復預設領域" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200 shrink-0 flex items-center justify-center shadow-xs cursor-pointer">
                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
               </button>
-              <button id="btn-open-add-subject" class="px-2.5 py-1 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-200 flex items-center space-x-1">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                <span>自訂新領域</span>
+
+              <button id="btn-open-add-subject" class="flex-1 py-1.5 px-2 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors border border-indigo-200 flex items-center justify-center space-x-1 whitespace-nowrap shadow-xs cursor-pointer">
+                <i data-lucide="plus" class="w-3.5 h-3.5 shrink-0"></i>
+                <span class="whitespace-nowrap">自訂新領域</span>
               </button>
             </div>
           </div>
@@ -555,7 +560,7 @@
 
         <!-- Lead time select -->
         <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-lg">
-          <span class="text-slate-400">提前提醒：</span>
+          <span class="text-slate-400">首次提醒：</span>
           <select id="select-lead-minutes" class="bg-slate-700 text-white rounded px-2 py-0.5 outline-none font-semibold">
             <option value="1.5">1 分半 (90秒)</option>
             <option value="2">2 分鐘</option>
@@ -581,9 +586,10 @@
           <input type="number" id="input-custom-warning-minutes" min="0.2" max="10" step="0.1" value="1" placeholder="分" class="hidden w-16 bg-slate-700 border border-rose-500 text-white rounded px-2 py-0.5 outline-none font-mono text-xs">
         </div>
 
-        <button id="btn-toggle-sim-bar" class="flex items-center space-x-1 px-3 py-1.5 bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/50 rounded-lg">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-          <span>測試模擬時間</span>
+        <button id="btn-toggle-sim-bar" class="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer">
+          <i data-lucide="sparkles" id="sim-btn-icon" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span id="sim-btn-text">模擬測試</span>
+          <span id="sim-btn-status" class="hidden ml-1 px-1.5 py-0.2 bg-amber-400 text-slate-950 font-bold rounded text-[10px]">開啟中</span>
         </button>
 
         <!-- Minimal Mode Button -->
@@ -821,8 +827,15 @@
       warningMinutes: 1, // 預設 1 分鐘警示時間
       warningMsgHome: '請於上課鐘響前就坐，並備妥學用品，準備上課!!',
       warningMsgOutside: '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!',
-      simulatedMode: false,
-      simulatedDate: null,
+      simulatedMode: true,
+      simulatedDate: (() => {
+        const d = new Date();
+        const curDay = d.getDay();
+        const diff = 1 - (curDay === 0 ? 7 : curDay);
+        d.setDate(d.getDate() + diff);
+        d.setHours(9, 16, 0, 0);
+        return d;
+      })(),
       lastChimeTimestamp: null,
     };
 
@@ -2253,6 +2266,17 @@
       const reminderOverlay = document.getElementById('reminder-board-overlay');
       document.getElementById('btn-open-reminder').addEventListener('click', () => {
         reminderOverlay.classList.remove('hidden');
+        if (!AppState.simulatedMode) {
+          AppState.simulatedMode = true;
+          const d = new Date();
+          const curDay = d.getDay();
+          const diff = 1 - (curDay === 0 ? 7 : curDay);
+          d.setDate(d.getDate() + diff);
+          d.setHours(9, 16, 0, 0);
+          AppState.simulatedDate = d;
+          if (simBar) simBar.classList.remove('hidden');
+          updateSimButtonState(true);
+        }
         updateReminderBoard();
       });
 
@@ -2397,25 +2421,26 @@
       const btnSimToggle = document.getElementById('btn-toggle-sim-bar');
       const simBtnIcon = document.getElementById('sim-btn-icon');
       const simBtnText = document.getElementById('sim-btn-text');
-      const simBtnStatus = document.getElementById('sim-btn-status');
 
       function updateSimButtonState(isOpen) {
         if (!btnSimToggle) return;
         if (isOpen) {
-          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 border bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-500/20 ring-1 ring-indigo-400';
-          if (simBtnIcon) simBtnIcon.className = 'w-3.5 h-3.5 text-amber-300 animate-bounce';
-          if (simBtnText) simBtnText.innerText = '模擬測試中';
-          if (simBtnStatus) simBtnStatus.classList.remove('hidden');
+          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 border bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-500/20 ring-1 ring-indigo-400 cursor-pointer whitespace-nowrap';
+          if (simBtnIcon) simBtnIcon.className = 'w-3.5 h-3.5 text-amber-300';
+          if (simBtnText) simBtnText.innerText = '模擬測試';
         } else {
-          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 border bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 shadow-sm';
+          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 border bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 shadow-sm cursor-pointer whitespace-nowrap';
           if (simBtnIcon) simBtnIcon.className = 'w-3.5 h-3.5 text-slate-400';
           if (simBtnText) simBtnText.innerText = '模擬測試';
-          if (simBtnStatus) simBtnStatus.classList.add('hidden');
         }
       }
 
-      // Initial state (hidden)
-      updateSimButtonState(false);
+      // Initial state: 預設開啟模擬模式
+      const simSelectWeekday = document.getElementById('sim-select-weekday');
+      const simCustomTime = document.getElementById('sim-custom-time');
+      if (simSelectWeekday) simSelectWeekday.value = "1";
+      if (simCustomTime) simCustomTime.value = "09:16";
+      updateSimButtonState(true);
 
       if (btnSimToggle && simBar) {
         btnSimToggle.addEventListener('click', () => {
