@@ -116,6 +116,15 @@
     .animate-soft-pulse {
       animation: softPulse 3s infinite ease-in-out;
     }
+
+    /* Minimal Distraction-Free Board Mode */
+    .minimal-mode #reminder-top-bar,
+    .minimal-mode #sim-controls-bar {
+      display: none !important;
+    }
+    .minimal-mode #minimal-floating-bar {
+      display: flex !important;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
@@ -514,8 +523,20 @@
   <!-- 8. Fullscreen Classroom Reminder Board -->
   <div id="reminder-board-overlay" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex flex-col text-white select-none">
     
+    <!-- Minimal Mode Floating Overlay Controls (Hidden by default, visible on hover) -->
+    <div id="minimal-floating-bar" class="hidden absolute top-4 right-4 z-50 items-center space-x-2 bg-slate-900/70 hover:bg-slate-900/95 border border-slate-700/60 backdrop-blur-md py-1.5 px-3 rounded-full shadow-lg transition-opacity opacity-30 hover:opacity-100">
+      <button id="btn-exit-minimal-float" class="flex items-center space-x-1.5 text-xs text-slate-300 hover:text-white font-medium cursor-pointer">
+        <i data-lucide="undo-2" class="w-3.5 h-3.5 text-amber-400"></i>
+        <span>退出純淨模式 (Esc)</span>
+      </button>
+      <span class="text-slate-600">|</span>
+      <button id="btn-close-reminder-float" title="關閉看板" class="text-slate-400 hover:text-rose-400 p-0.5 cursor-pointer">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
     <!-- Top Bar -->
-    <div class="px-6 py-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80">
+    <div id="reminder-top-bar" class="px-6 py-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80">
       <div class="flex items-center space-x-3">
         <div class="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
           <i data-lucide="bell" class="w-5 h-5"></i>
@@ -563,6 +584,12 @@
         <button id="btn-toggle-sim-bar" class="flex items-center space-x-1 px-3 py-1.5 bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/50 rounded-lg">
           <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
           <span>測試模擬時間</span>
+        </button>
+
+        <!-- Minimal Mode Button -->
+        <button id="btn-toggle-minimal-mode" class="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium shadow-sm">
+          <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
+          <span>純淨看板模式</span>
         </button>
 
         <button id="btn-toggle-fullscreen" class="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg">
@@ -2230,11 +2257,68 @@
       });
 
       document.getElementById('btn-close-reminder').addEventListener('click', () => {
+        reminderOverlay.classList.remove('minimal-mode');
         reminderOverlay.classList.add('hidden');
         if (document.fullscreenElement) {
           document.exitFullscreen().catch(() => {});
         }
       });
+
+      // Distraction-Free Minimal Mode Handlers
+      const btnToggleMinimal = document.getElementById('btn-toggle-minimal-mode');
+      const btnExitMinimalFloat = document.getElementById('btn-exit-minimal-float');
+      const btnCloseReminderFloat = document.getElementById('btn-close-reminder-float');
+
+      const setMinimalMode = (enabled) => {
+        if (enabled) {
+          reminderOverlay.classList.add('minimal-mode');
+        } else {
+          reminderOverlay.classList.remove('minimal-mode');
+        }
+      };
+
+      if (btnToggleMinimal) {
+        btnToggleMinimal.addEventListener('click', () => {
+          setMinimalMode(true);
+        });
+      }
+
+      if (btnExitMinimalFloat) {
+        btnExitMinimalFloat.addEventListener('click', () => {
+          setMinimalMode(false);
+        });
+      }
+
+      if (btnCloseReminderFloat) {
+        btnCloseReminderFloat.addEventListener('click', () => {
+          setMinimalMode(false);
+          reminderOverlay.classList.add('hidden');
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
+        });
+      }
+
+      // Keyboard Esc to exit minimal mode or close fullscreen
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !reminderOverlay.classList.contains('hidden')) {
+          if (reminderOverlay.classList.contains('minimal-mode')) {
+            setMinimalMode(false);
+          }
+        }
+      });
+
+      // Double click stage background to toggle minimal mode
+      const liveStage = reminderOverlay.querySelector('.flex-1');
+      if (liveStage) {
+        liveStage.addEventListener('dblclick', (e) => {
+          // If not clicked inside the status container, toggle minimal mode
+          if (!e.target.closest('#board-status-container')) {
+            const isCurrentlyMinimal = reminderOverlay.classList.contains('minimal-mode');
+            setMinimalMode(!isCurrentlyMinimal);
+          }
+        });
+      }
 
       document.getElementById('btn-toggle-fullscreen').addEventListener('click', () => {
         if (!document.fullscreenElement) {
@@ -2310,9 +2394,36 @@
       }
 
       const simBar = document.getElementById('sim-controls-bar');
-      document.getElementById('btn-toggle-sim-bar').addEventListener('click', () => {
-        simBar.classList.toggle('hidden');
-      });
+      const btnSimToggle = document.getElementById('btn-toggle-sim-bar');
+      const simBtnIcon = document.getElementById('sim-btn-icon');
+      const simBtnText = document.getElementById('sim-btn-text');
+      const simBtnStatus = document.getElementById('sim-btn-status');
+
+      function updateSimButtonState(isOpen) {
+        if (!btnSimToggle) return;
+        if (isOpen) {
+          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 border bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-500/20 ring-1 ring-indigo-400';
+          if (simBtnIcon) simBtnIcon.className = 'w-3.5 h-3.5 text-amber-300 animate-bounce';
+          if (simBtnText) simBtnText.innerText = '模擬測試中';
+          if (simBtnStatus) simBtnStatus.classList.remove('hidden');
+        } else {
+          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 border bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 shadow-sm';
+          if (simBtnIcon) simBtnIcon.className = 'w-3.5 h-3.5 text-slate-400';
+          if (simBtnText) simBtnText.innerText = '模擬測試';
+          if (simBtnStatus) simBtnStatus.classList.add('hidden');
+        }
+      }
+
+      // Initial state (hidden)
+      updateSimButtonState(false);
+
+      if (btnSimToggle && simBar) {
+        btnSimToggle.addEventListener('click', () => {
+          simBar.classList.toggle('hidden');
+          const isNowOpen = !simBar.classList.contains('hidden');
+          updateSimButtonState(isNowOpen);
+        });
+      }
 
       document.getElementById('btn-sim-reallife').addEventListener('click', () => {
         AppState.simulatedMode = false;
