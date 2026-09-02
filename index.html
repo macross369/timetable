@@ -1,0 +1,2397 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智慧課表產生器與課堂提醒系統</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- html2canvas for PNG export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- Tone.js for soft chime alerts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f4f6fb',
+              100: '#e8ecf8',
+              500: '#4f46e5',
+              600: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #f1f4f9;
+      color: #334155;
+    }
+    
+    .dragging {
+      opacity: 0.45;
+      transform: scale(0.96);
+    }
+    .drag-over {
+      background-color: #e0e7ff !important;
+      outline: 2px dashed #6366f1 !important;
+      outline-offset: -2px;
+    }
+
+    /* Course card table-cell vertical centering utility - Immune to canvas baseline shifts */
+    .schedule-badge-outer {
+      display: table !important;
+      width: 100%;
+      max-width: 112px;
+      height: 42px;
+      margin: 0 auto;
+      border-radius: 16px;
+      border-width: 1.5px;
+      border-style: solid;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .schedule-badge-inner {
+      display: table-cell !important;
+      vertical-align: middle !important;
+      text-align: center !important;
+      line-height: 1 !important;
+      padding-top: 0px !important;
+      padding-bottom: 6px !important;
+      padding-left: 4px !important;
+      padding-right: 4px !important;
+      font-size: 13px;
+      font-weight: 700;
+      user-select: none;
+    }
+
+    /* Export mode override rules */
+    .export-rendering-mode {
+      width: 900px !important;
+      min-width: 900px !important;
+      background-color: #ffffff !important;
+    }
+    .export-rendering-mode * {
+      letter-spacing: normal !important;
+    }
+
+    @media print {
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      #schedule-export-wrapper {
+        box-shadow: none !important;
+        border: none !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+    }
+
+    @keyframes softPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    .animate-soft-pulse {
+      animation: softPulse 3s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <header class="no-print bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Brand Logo -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-100">
+          <i data-lucide="calendar-days" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-800 leading-tight">課表產生器</h1>
+          <p class="text-xs text-slate-400 font-medium">智慧課堂叮嚀與電子看板系統</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <button id="btn-open-reminder" class="flex items-center space-x-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm rounded-xl shadow-sm transition-all transform active:scale-95">
+          <i data-lucide="bell-ring" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">課堂智慧提醒看板</span>
+          <span class="sm:hidden">提醒看板</span>
+        </button>
+
+        <button id="btn-export-json" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors">
+          <i data-lucide="file-down" class="w-4 h-4 text-slate-500"></i>
+          <span class="hidden lg:inline">匯出課表</span>
+        </button>
+
+        <button id="btn-trigger-import" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors">
+          <i data-lucide="file-up" class="w-4 h-4 text-slate-500"></i>
+          <span class="hidden lg:inline">匯入課表</span>
+        </button>
+        <input type="file" id="input-import-json" accept=".json" class="hidden">
+
+        <button id="btn-clear-grid" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors">
+          <i data-lucide="rotate-ccw" class="w-4 h-4 text-slate-500"></i>
+          <span class="hidden md:inline">清空課表</span>
+        </button>
+
+        <button onclick="window.print()" class="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm rounded-xl shadow-sm transition-all">
+          <i data-lucide="printer" class="w-4 h-4"></i>
+          <span>列印 / 存為 PDF</span>
+        </button>
+
+        <button id="btn-export-png" class="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-all">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>下載圖片 (PNG)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- Left Sidebar -->
+      <div class="no-print lg:col-span-4 space-y-5">
+
+        <!-- Tips Banner -->
+        <div class="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4.5 text-xs text-indigo-900 leading-relaxed shadow-sm">
+          <div class="flex items-start space-x-2.5">
+            <div class="p-1 bg-indigo-200/60 text-indigo-700 rounded-lg mt-0.5">
+              <i data-lucide="info" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-sm text-indigo-950 mb-1.5">操作說明：</h4>
+              <ol class="space-y-1 text-indigo-800 list-decimal list-inside">
+                <li><strong class="font-semibold text-indigo-950">點選置入</strong>：先點選下方領域，再點擊課表格子放入。</li>
+                <li><strong class="font-semibold text-indigo-950">拖曳置入</strong>：按住領域卡片直接拖曳至格子內。</li>
+                <li><strong class="font-semibold text-indigo-950">點擊清除</strong>：點選已安排的格子可將該節清空。</li>
+                <li><strong class="font-semibold text-indigo-950">晨間活動</strong>：晨間時段支援直接點入輸入文字。</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subject Selection Area -->
+        <div class="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-3.5 pb-2.5 border-b border-slate-100">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="palette" class="w-5 h-5 text-indigo-600"></i>
+              <h3 class="font-bold text-slate-800 text-base">領域選擇區</h3>
+            </div>
+            <div class="flex items-center space-x-1.5">
+              <button id="btn-toggle-delete-mode" title="點擊切換進入刪除領域模式" class="px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors border border-rose-200 flex items-center space-x-1">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span id="delete-mode-text">刪除領域按鈕</span>
+              </button>
+              <button id="btn-reset-subjects" title="恢復預設領域" class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              </button>
+              <button id="btn-open-add-subject" class="px-2.5 py-1 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-200 flex items-center space-x-1">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>自訂新領域</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Selection Indicator -->
+          <div class="mb-4 bg-slate-50 px-3.5 py-2 rounded-xl flex items-center justify-between text-xs">
+            <span class="text-slate-500">當前選擇：</span>
+            <div id="current-selected-badge" class="flex items-center space-x-2 font-medium">
+              <span class="text-slate-400">尚未選擇（點擊下方領域卡片）</span>
+            </div>
+          </div>
+
+          <!-- Subject Badges Grid -->
+          <div id="subject-palette-container" class="grid grid-cols-4 gap-2.5">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Classroom Locations Link -->
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-400">各領域上課教室地點：</span>
+            <button id="btn-open-classroom-modal" class="text-indigo-600 font-semibold hover:underline flex items-center space-x-1">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+              <span>設定科任教室</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Schedule Settings Card -->
+        <div class="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="sliders" class="w-5 h-5 text-indigo-600"></i>
+              <h3 class="font-bold text-slate-800 text-base">課表與時段設定</h3>
+            </div>
+          </div>
+
+          <!-- Open Periods Editor -->
+          <button id="btn-open-periods-modal" class="w-full py-2 px-3 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 font-medium text-xs rounded-xl border border-indigo-200/80 flex items-center justify-center space-x-1.5 transition-colors">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+            <span>編輯各節時段、時間與提醒語</span>
+          </button>
+
+          <!-- Open Subject Message Config -->
+          <button id="btn-open-subject-messages-modal" class="w-full py-2 px-3 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 font-medium text-xs rounded-xl border border-emerald-200/80 flex items-center justify-center space-x-1.5 transition-colors">
+            <i data-lucide="message-square" class="w-4 h-4"></i>
+            <span>設定領域課程訊息 (上課前與上課中提示)</span>
+          </button>
+
+          <!-- Open Warning Message Config (Red) -->
+          <button id="btn-open-warning-messages-modal" class="w-full py-2 px-3 bg-rose-50/70 hover:bg-rose-100 text-rose-700 font-medium text-xs rounded-xl border border-rose-200/80 flex items-center justify-center space-x-1.5 transition-colors">
+            <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600"></i>
+            <span>設定警示時間訊息 (原班教室與科任教室警示提示)</span>
+          </button>
+
+          <!-- Schedule Title Input -->
+          <div>
+            <label for="input-schedule-title" class="block text-xs font-semibold text-slate-500 mb-1">課表標題</label>
+            <input type="text" id="input-schedule-title" value="我的每週課表" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 font-bold transition-all">
+          </div>
+
+          <!-- Class/Subtitle Input -->
+          <div>
+            <label for="input-schedule-subtitle" class="block text-xs font-semibold text-slate-500 mb-1">備註 / 班級訊息</label>
+            <input type="text" id="input-schedule-subtitle" value="三年甲班 │ 115學年度第一學期" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-600 transition-all">
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Main Schedule Table -->
+      <div class="lg:col-span-8">
+        <div id="schedule-export-wrapper" class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
+          
+          <div class="text-center mb-6">
+            <h2 id="display-schedule-title" class="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-wider">我的每週課表</h2>
+            <p id="display-schedule-subtitle" class="text-xs sm:text-sm text-slate-500 mt-1 font-medium">三年甲班 │ 115學年度第一學期</p>
+            <div class="w-16 h-1 bg-indigo-500/80 mx-auto mt-3 rounded-full"></div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table id="main-schedule-table" class="w-full table-fixed border-collapse text-center">
+              <thead>
+                <tr class="text-slate-700 text-xs sm:text-sm font-bold border-b border-slate-200/80">
+                  <th class="py-3 px-2 w-28 min-w-[100px] bg-slate-50/50 rounded-tl-xl text-slate-500">時段</th>
+                  <th class="py-3 px-2 w-[18%]">星期一</th>
+                  <th class="py-3 px-2 w-[18%]">星期二</th>
+                  <th class="py-3 px-2 w-[18%]">星期三</th>
+                  <th class="py-3 px-2 w-[18%]">星期四</th>
+                  <th class="py-3 px-2 w-[18%] rounded-tr-xl">星期五</th>
+                </tr>
+              </thead>
+              <tbody id="schedule-table-body" class="divide-y divide-slate-100 text-xs sm:text-sm">
+                <!-- Timetable rows rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- 1. Add Subject Modal -->
+  <div id="modal-add-subject" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
+      <h3 class="text-base font-bold text-slate-800 mb-3 flex items-center space-x-2">
+        <i data-lucide="plus-circle" class="w-5 h-5 text-indigo-600"></i>
+        <span>自訂新領域 / 科目</span>
+      </h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">領域名稱 (如：生活、探究)</label>
+          <input type="text" id="new-subject-name" placeholder="輸入名稱" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">科任上課地點</label>
+          <input type="text" id="new-subject-room" placeholder="例如：原班教室、語言教室" value="原班教室" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">標籤外觀顏色風格 (8色)</label>
+          <div id="color-picker-group" class="grid grid-cols-4 gap-2"></div>
+        </div>
+      </div>
+      <div class="mt-5 flex justify-end space-x-2">
+        <button id="btn-cancel-add-subject" class="px-3.5 py-1.5 text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">取消</button>
+        <button id="btn-confirm-add-subject" class="px-3.5 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium">新增領域</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Edit Periods Modal -->
+  <div id="modal-periods" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+          <i data-lucide="clock" class="w-5 h-5 text-indigo-600"></i>
+          <span>編輯時段名稱、起訖時間與提醒語</span>
+        </h3>
+        <button id="btn-close-periods-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <p class="text-xs text-slate-500 mt-2 mb-3">請設定每一節課的起訖時間與專屬提醒詞，看板將於課前及課中即時切換顯示。</p>
+      
+      <div id="periods-editor-list" class="space-y-3 overflow-y-auto pr-1 flex-1"></div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end space-x-2">
+        <button id="btn-reset-periods-default" class="mr-auto text-xs text-rose-600 hover:underline">還原預設時段與時間</button>
+        <button id="btn-save-periods" class="px-4 py-2 text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl font-medium">儲存時段設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Classroom Locations Modal -->
+  <div id="modal-classrooms" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+          <i data-lucide="map-pin" class="w-5 h-5 text-indigo-600"></i>
+          <span>設定各領域上課教室地點</span>
+        </h3>
+        <button id="btn-close-classrooms-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <p class="text-xs text-slate-500 mt-2 mb-3">設定科任教室地點後，將會在提醒看板上課前自動提示學生前往。</p>
+      
+      <div id="classrooms-editor-list" class="space-y-2 overflow-y-auto pr-1 flex-1 max-h-60"></div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end space-x-2">
+        <button id="btn-save-classrooms" class="px-4 py-2 text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl font-medium">儲存地點設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Subject Messages Config Modal (上課前與上課中提示) -->
+  <div id="modal-subject-messages" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+          <i data-lucide="message-square" class="w-5 h-5 text-emerald-600"></i>
+          <span>設定領域課程訊息 (上課前與上課中提示)</span>
+        </h3>
+        <button id="btn-close-subject-messages-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <p class="text-xs text-slate-500 mt-2 mb-3">針對各個學科領域自訂課前準備用具提醒與上課時的專注提示，將於看板對應時段即時呈現。</p>
+      
+      <div id="subject-messages-editor-list" class="space-y-3 overflow-y-auto pr-1 flex-1"></div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end space-x-2">
+        <button id="btn-save-subject-messages" class="px-4 py-2 text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl font-medium">儲存領域提示語</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Warning Messages Config Modal (紅色系警示時間訊息) -->
+  <div id="modal-warning-messages" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-xl max-h-[90vh] flex flex-col border border-rose-200">
+      <div class="flex items-center justify-between pb-3 border-b border-rose-100">
+        <h3 class="text-base font-bold text-rose-800 flex items-center space-x-2">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600"></i>
+          <span>設定警示時間訊息 (原班教室與科任教室警示提示)</span>
+        </h3>
+        <button id="btn-close-warning-messages-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <p class="text-xs text-rose-600/90 mt-2 mb-3">當倒數進入警示時間（如剩下 1 分鐘）時，看板將切換為紅色視覺並顯示此處設定的提醒語。</p>
+      
+      <div class="space-y-4 flex-1 overflow-y-auto pr-1">
+        <div class="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2">
+          <label class="block text-xs font-bold text-rose-900 flex items-center space-x-1.5">
+            <i data-lucide="home" class="w-4 h-4 text-rose-600"></i>
+            <span>上課地點為「原班教室」之警示提醒語：</span>
+          </label>
+          <input type="text" id="input-warning-msg-home" class="w-full px-3.5 py-2 text-xs sm:text-sm border border-rose-200 rounded-xl outline-none focus:ring-2 focus:ring-rose-500 bg-white font-medium text-slate-800" value="請於上課鐘響前就坐，並備妥學用品，準備上課!!">
+          <p class="text-[11px] text-rose-600/80">預設：請於上課鐘響前就坐，並備妥學用品，準備上課!!</p>
+        </div>
+
+        <div class="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2">
+          <label class="block text-xs font-bold text-rose-900 flex items-center space-x-1.5">
+            <i data-lucide="external-link" class="w-4 h-4 text-rose-600"></i>
+            <span>上課地點為「其他教室/地點」之警示提醒語：</span>
+          </label>
+          <input type="text" id="input-warning-msg-outside" class="w-full px-3.5 py-2 text-xs sm:text-sm border border-rose-200 rounded-xl outline-none focus:ring-2 focus:ring-rose-500 bg-white font-medium text-slate-800" value="請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!">
+          <p class="text-[11px] text-rose-600/80">預設：請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!</p>
+        </div>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-rose-100 flex justify-between items-center">
+        <button id="btn-reset-warning-messages" class="text-xs text-rose-600 hover:underline">還原預設提示語</button>
+        <button id="btn-save-warning-messages" class="px-4 py-2 text-xs text-white bg-rose-600 hover:bg-rose-700 rounded-xl font-medium shadow-sm">儲存警示訊息</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Clothing Picker & Management Modal -->
+  <div id="modal-clothing-picker" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+        <h4 class="text-sm font-bold text-slate-800 flex items-center space-x-1.5">
+          <i data-lucide="shirt" class="w-4 h-4 text-indigo-600"></i>
+          <span id="clothing-modal-day-title">選擇穿著</span>
+        </h4>
+        <div class="flex items-center space-x-1">
+          <button id="tab-clothing-select" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200">選擇穿著</button>
+          <button id="tab-clothing-manage" class="px-2.5 py-1 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100">管理/自訂服裝</button>
+          <button id="btn-close-clothing" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+      </div>
+
+      <!-- Tab 1: Select Clothing -->
+      <div id="view-clothing-select" class="space-y-3">
+        <p class="text-xs text-slate-400">點擊下方服裝設定為該日穿著：</p>
+        <div class="grid grid-cols-2 gap-2" id="clothing-options-container"></div>
+        <div class="flex justify-between items-center pt-3 border-t border-slate-100 text-xs">
+          <button id="btn-clear-clothing" class="text-rose-500 hover:underline">清除該日穿著</button>
+          <span class="text-slate-400">如需自訂可切換管理標籤</span>
+        </div>
+      </div>
+
+      <!-- Tab 2: Manage Clothing Types -->
+      <div id="view-clothing-manage" class="hidden space-y-4 overflow-y-auto pr-1">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5">
+          <div class="font-bold text-slate-700 flex items-center justify-between">
+            <span id="clothing-form-title">新增服裝項目</span>
+            <button id="btn-reset-clothing-defaults" class="text-slate-400 hover:text-rose-600 text-[11px] underline">還原預設服裝</button>
+          </div>
+          <div class="flex space-x-2">
+            <input type="text" id="input-new-clothing-name" placeholder="服裝名稱 (例: 班服)" class="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+            <button id="btn-submit-clothing-form" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs">新增</button>
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-500 mb-1">選擇服裝顏色：</label>
+            <div id="clothing-color-palette-group" class="grid grid-cols-4 gap-1.5"></div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-2">現有服裝清單 (可改名、改色或刪除)：</label>
+          <div id="clothing-manage-list" class="space-y-2 max-h-56 overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 7. Confirm Dialog Modal -->
+  <div id="modal-confirm" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl text-center space-y-4">
+      <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h3 id="confirm-modal-title" class="text-base font-bold text-slate-800">請確認操作</h3>
+        <p id="confirm-modal-msg" class="text-xs text-slate-500 mt-1">確定要執行此動作嗎？</p>
+      </div>
+      <div class="flex items-center justify-center space-x-2 pt-2">
+        <button id="btn-confirm-cancel" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">取消</button>
+        <button id="btn-confirm-ok" class="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors">確定執行</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Fullscreen Classroom Reminder Board -->
+  <div id="reminder-board-overlay" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex flex-col text-white select-none">
+    
+    <!-- Top Bar -->
+    <div class="px-6 py-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80">
+      <div class="flex items-center space-x-3">
+        <div class="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-bold tracking-wide">課堂智慧提醒看板</h2>
+          <p class="text-xs text-slate-400" id="reminder-class-info">課堂即時動態</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3 text-xs">
+        <button id="btn-toggle-sound" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">
+          <i data-lucide="volume-2" id="sound-icon" class="w-4 h-4 text-emerald-400"></i>
+          <span id="sound-text">提醒音：開</span>
+        </button>
+
+        <!-- Lead time select -->
+        <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-lg">
+          <span class="text-slate-400">提前提醒：</span>
+          <select id="select-lead-minutes" class="bg-slate-700 text-white rounded px-2 py-0.5 outline-none font-semibold">
+            <option value="1.5">1 分半 (90秒)</option>
+            <option value="2">2 分鐘</option>
+            <option value="3">3 分鐘</option>
+            <option value="5" selected>5 分鐘</option>
+            <option value="custom">自訂時間...</option>
+          </select>
+          <input type="number" id="input-custom-lead-minutes" min="0.5" max="30" step="0.5" value="5" placeholder="分" class="hidden w-16 bg-slate-700 border border-slate-600 text-white rounded px-2 py-0.5 outline-none font-mono text-xs">
+        </div>
+
+        <!-- Warning time select (Red alert mode) -->
+        <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-lg border border-rose-500/40">
+          <span class="text-rose-400 font-semibold flex items-center space-x-1">
+            <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+            <span>警示時間：</span>
+          </span>
+          <select id="select-warning-minutes" class="bg-slate-700 text-rose-300 rounded px-2 py-0.5 outline-none font-semibold">
+            <option value="0.5">30 秒</option>
+            <option value="1" selected>1 分鐘</option>
+            <option value="1.5">1 分半</option>
+            <option value="custom">自訂時間...</option>
+          </select>
+          <input type="number" id="input-custom-warning-minutes" min="0.2" max="10" step="0.1" value="1" placeholder="分" class="hidden w-16 bg-slate-700 border border-rose-500 text-white rounded px-2 py-0.5 outline-none font-mono text-xs">
+        </div>
+
+        <button id="btn-toggle-sim-bar" class="flex items-center space-x-1 px-3 py-1.5 bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/50 rounded-lg">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          <span>測試模擬時間</span>
+        </button>
+
+        <button id="btn-toggle-fullscreen" class="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg">
+          <i data-lucide="maximize" class="w-4 h-4"></i>
+        </button>
+        <button id="btn-close-reminder" class="p-2 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Simulation Bar -->
+    <div id="sim-controls-bar" class="bg-indigo-950/80 border-b border-indigo-800/60 px-6 py-2.5 flex flex-wrap items-center justify-between text-xs text-indigo-200">
+      <div class="flex items-center space-x-3 mb-1 sm:mb-0">
+        <span class="font-bold text-amber-300 flex items-center space-x-1">
+          <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i>
+          <span>時間模擬中：</span>
+        </span>
+        <button id="btn-sim-reallife" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded font-medium">真實時間</button>
+        <button id="btn-sim-break" class="px-2.5 py-1 bg-amber-600/40 hover:bg-amber-600 text-amber-100 rounded border border-amber-500/50">模擬「下課課前4分鐘」</button>
+        <button id="btn-sim-warning" class="px-2.5 py-1 bg-rose-600/40 hover:bg-rose-600 text-rose-100 rounded border border-rose-500/50">模擬「紅色警示課前45秒」</button>
+        <button id="btn-sim-class" class="px-2.5 py-1 bg-emerald-600/40 hover:bg-emerald-600 text-emerald-100 rounded border border-emerald-500/50">模擬「上課專心中」</button>
+      </div>
+      <div class="flex items-center space-x-2">
+        <span>自選星期：</span>
+        <select id="sim-select-weekday" class="bg-indigo-900 border border-indigo-700 text-white rounded px-2 py-0.5">
+          <option value="1">星期一</option>
+          <option value="2">星期二</option>
+          <option value="3">星期三</option>
+          <option value="4">星期四</option>
+          <option value="5">星期五</option>
+        </select>
+        <span>自訂時間：</span>
+        <input type="time" id="sim-custom-time" class="bg-indigo-900 border border-indigo-700 text-white rounded px-2 py-0.5">
+      </div>
+    </div>
+
+    <!-- Live Stage -->
+    <div class="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-4xl mx-auto w-full relative">
+      <div class="mb-4">
+        <div id="board-live-clock" class="text-4xl sm:text-6xl font-black tracking-tight text-slate-100 font-mono">00:00:00</div>
+        <div id="board-live-date" class="text-sm sm:text-base text-slate-400 font-medium mt-1">日期載入中...</div>
+      </div>
+
+      <div id="board-status-container" class="w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500">
+        <!-- Live status updated dynamically -->
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /* 8 Standard Colors (無粉紅、深綠、深藍，新增奶茶色) */
+    const PRESET_COLOR_PALETTES = [
+      { key: 'red', label: '紅', bg: '#fee2e2', text: '#b91c1c', border: '#fca5a5' },
+      { key: 'orange', label: '橙', bg: '#ffedd5', text: '#c2410c', border: '#fed7aa' },
+      { key: 'yellow', label: '黃', bg: '#fef9c3', text: '#a16207', border: '#fde047' },
+      { key: 'lightgreen', label: '淺綠', bg: '#dcfce7', text: '#15803d', border: '#86efac' },
+      { key: 'lightblue', label: '淺藍', bg: '#e0f2fe', text: '#0369a1', border: '#7dd3fc' },
+      { key: 'purple', label: '紫', bg: '#f3e8ff', text: '#7e22ce', border: '#d8b4fe' },
+      { key: 'milktea', label: '奶茶', bg: '#f5ece5', text: '#785135', border: '#e2cebe' },
+      { key: 'gray', label: '灰', bg: '#f1f5f9', text: '#475569', border: '#cbd5e1' },
+    ];
+
+    const SUBJECT_DEFINITIONS = [
+      { name: '國語', room: '原班教室', preMsg: '請準備好國語課本、習作與上課所需文具', inMsg: '認真朗讀課文，主動舉手發表' },
+      { name: '數學', room: '原班教室', preMsg: '請準備好數學課本、習作、八格本與上課所需文具', inMsg: '仔細計算、主動驗算，跟上老師解題思考' },
+      { name: '英語', room: '英語教室', preMsg: '請攜帶英語課本、作業本、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '勇敢大聲開口說英語，積極參與互動' },
+      { name: '自然', room: '自然教室', preMsg: '請攜帶自然課本、習作、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '遵守實驗室安全規則，細心觀察與記錄' },
+      { name: '社會', room: '社會教室', preMsg: '請攜帶社會課本、習作、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '認真閱讀圖表資料，專注探究社會議題' },
+      { name: '體育', room: '操場 / 活動中心', preMsg: '請備妥個人運動器材及水壺，班長整隊後，帶隊前往集合地點', inMsg: '充分做好暖身運動，聽從指令、注意運動安全' },
+      { name: '音樂', room: '音樂教室(二)', preMsg: '請攜帶樂譜、直笛及水壺，班長整隊後，帶隊前往上課教室', inMsg: '用心聆聽音樂旋律，齊聲和諧合唱與吹奏' },
+      { name: '藝術', room: '原班教室', preMsg: '請備妥藝術課所需用品', inMsg: '發揮創意大膽創作，保持桌面與環境整潔' },
+      { name: '資訊', room: '電腦教室', preMsg: '請班長整隊後，帶隊前往電腦教室，勿攜帶飲用水', inMsg: '愛惜電腦設備，不隨意瀏覽非學習網頁' },
+      { name: '社團', room: '社團活動分組教室', preMsg: '請攜帶社團專屬用品與水壺，至各社團上課地點集合', inMsg: '積極投入社團訓練，展現團隊合作精神' },
+      { name: '綜合', room: '原班教室', preMsg: '請備妥綜合課本與上課所需文具', inMsg: '熱烈參與小組合作，傾聽他人意見' },
+      { name: '本土', room: '原班教室', preMsg: '請準備本土語課本、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '大聲開口講母語，認識本土文化之美' },
+      { name: '海洋', room: '原班教室', preMsg: '請準備平板及所需文具', inMsg: '能安靜聆聽老師上課，並用心完成各項任務，同時熱烈參與討論' },
+      { name: '律動', room: '韻律教室 / 活動中心', preMsg: '請攜帶水壺，班長整隊後，帶隊前往上課地點', inMsg: '跟隨節奏律動伸展，注意步伐與肢體安全' },
+      { name: '閱讀', room: '圖書館', preMsg: '請事先向老師確認今日上課的地點及所需準備之物品', inMsg: '輕聲細語、安靜沉浸於書香閱讀之中' },
+      { name: '議題', room: '原班教室', preMsg: '請事先向老師確認今日上課的地點及所需準備之物品', inMsg: '關心多元議題，理性思考並主動發表觀點' },
+      { name: '健康', room: '原班教室', preMsg: '請準備健康課本與上課所需文具', inMsg: '學習身心健康觀念，培養良好生活好習慣' },
+    ];
+
+    // 依現有課程依序搭配 8 種標準顏色
+    const DEFAULT_SUBJECTS = SUBJECT_DEFINITIONS.map((def, idx) => {
+      const color = PRESET_COLOR_PALETTES[idx % PRESET_COLOR_PALETTES.length];
+      return {
+        id: `sub-${idx + 1}`,
+        name: def.name,
+        bg: color.bg,
+        text: color.text,
+        border: color.border,
+        room: def.room,
+        preMsg: def.preMsg,
+        inMsg: def.inMsg,
+      };
+    });
+
+    const DEFAULT_PERIODS = [
+      { 
+        id: 'p-morning', 
+        name: '晨間時間', 
+        startTime: '08:00', 
+        endTime: '08:30', 
+        icon: 'sun', 
+        type: 'morning',
+        inClassMsg: '晨間活動請準時參與，保持安靜專注',
+        breakMsg: '下課請喝水、上廁所，讓眼睛好好休息一下'
+      },
+      { 
+        id: 'p-1', 
+        name: '第一節', 
+        startTime: '08:30', 
+        endTime: '09:10', 
+        icon: 'clock', 
+        type: 'class',
+        inClassMsg: '請保持安靜，認真聽講並主動思考',
+        breakMsg: '下課請喝水、上廁所，讓眼睛好好休息一下'
+      },
+      { 
+        id: 'p-2', 
+        name: '第二節', 
+        startTime: '09:20', 
+        endTime: '10:00', 
+        icon: 'clock', 
+        type: 'class',
+        inClassMsg: '請保持安靜，認真聽講並主動思考',
+        breakMsg: '下課請喝水、上廁所，讓眼睛好好休息一下'
+      },
+      { 
+        id: 'p-3', 
+        name: '第三節', 
+        startTime: '10:20', 
+        endTime: '11:00', 
+        icon: 'clock', 
+        type: 'class',
+        inClassMsg: '請保持安靜，認真聽講並主動思考',
+        breakMsg: '下課請喝水、上廁所，讓眼睛好好休息一下'
+      },
+      { 
+        id: 'p-4', 
+        name: '第四節', 
+        startTime: '11:10', 
+        endTime: '11:50', 
+        icon: 'clock', 
+        type: 'class',
+        inClassMsg: '請保持安靜，認真聽講並主動思考',
+        breakMsg: '下課請喝水、上廁所，讓眼睛好好休息一下'
+      },
+      { 
+        id: 'p-lunch', 
+        name: '午餐午休', 
+        startTime: '11:50', 
+        endTime: '13:20', 
+        icon: 'utensils', 
+        type: 'break',
+        inClassMsg: '用餐細嚼慢嚥，午休保持教室安靜',
+        breakMsg: '午休結束請洗洗臉、喝口水，準備下午課程'
+      },
+      { 
+        id: 'p-5', 
+        name: '第五節', 
+        startTime: '13:30', 
+        endTime: '14:10', 
+        icon: 'clock', 
+        type: 'class',
+        inClassMsg: '請保持安靜，認真聽講並主動思考',
+        breakMsg: '下課請喝水、上廁所，讓眼睛好好休息一下'
+      },
+      { 
+        id: 'p-6', 
+        name: '第六節', 
+        startTime: '14:20', 
+        endTime: '15:00', 
+        icon: 'clock', 
+        type: 'class',
+        inClassMsg: '請保持安靜，認真聽講並主動思考',
+        breakMsg: '下課請喝水、上廁所，讓眼睛好好休息一下'
+      },
+      { 
+        id: 'p-7', 
+        name: '第七節', 
+        startTime: '15:15', 
+        endTime: '15:55', 
+        icon: 'clock', 
+        type: 'class',
+        inClassMsg: '請保持安靜，認真聽講並主動思考',
+        breakMsg: '請收拾書包，並確認聯絡簿及回家作業是否均有放入書包!!!'
+      },
+    ];
+
+    // 預設服裝：運動服黃色、校服淺綠色、便服紫色、班服紅色
+    const DEFAULT_CLOTHING_TYPES = [
+      { id: 'cloth-1', name: '制服', bg: '#e0f2fe', text: '#0369a1', border: '#7dd3fc' },
+      { id: 'cloth-2', name: '運動服', bg: '#fef9c3', text: '#a16207', border: '#fde047' },
+      { id: 'cloth-3', name: '校服', bg: '#dcfce7', text: '#15803d', border: '#86efac' },
+      { id: 'cloth-4', name: '便服', bg: '#f3e8ff', text: '#7e22ce', border: '#d8b4fe' },
+      { id: 'cloth-5', name: '班服', bg: '#fee2e2', text: '#b91c1c', border: '#fca5a5' },
+    ];
+
+    // In-memory application state
+    const AppState = {
+      subjects: JSON.parse(JSON.stringify(DEFAULT_SUBJECTS)),
+      periods: JSON.parse(JSON.stringify(DEFAULT_PERIODS)),
+      scheduleTitle: '我的每週課表',
+      scheduleSubtitle: '三年甲班 │ 115學年度第一學期',
+      clothingTypes: JSON.parse(JSON.stringify(DEFAULT_CLOTHING_TYPES)),
+      clothing: { 1: '運動服', 2: '校服', 3: '便服', 4: '運動服', 5: '班服' },
+      grid: {
+        'p-morning-1': '朝會',
+        'p-morning-2': '晨會',
+        'p-morning-3': '早自習',
+        'p-morning-4': '早自習',
+        'p-morning-5': '早自習',
+        'p-1-1': '國語',
+        'p-2-1': '數學',
+        'p-3-1': '英語',
+        'p-4-1': '自然',
+      },
+      currentSelectedSubject: null,
+      isDeleteSubjectMode: false,
+      activeClothingDay: null,
+      selectedClothingColor: PRESET_COLOR_PALETTES[3], // 淺綠
+      
+      // Reminder & Warning State
+      reminderSound: true,
+      leadMinutes: 5,
+      warningMinutes: 1, // 預設 1 分鐘警示時間
+      warningMsgHome: '請於上課鐘響前就坐，並備妥學用品，準備上課!!',
+      warningMsgOutside: '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!',
+      simulatedMode: false,
+      simulatedDate: null,
+      lastChimeTimestamp: null,
+    };
+
+    function renderSubjectPalette() {
+      const container = document.getElementById('subject-palette-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      AppState.subjects.forEach(sub => {
+        const isSelected = AppState.currentSelectedSubject && AppState.currentSelectedSubject.id === sub.id;
+        
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.draggable = !AppState.isDeleteSubjectMode;
+        btn.dataset.subjectId = sub.id;
+        btn.className = `relative py-2 px-2 text-center rounded-xl font-bold text-sm transition-all duration-150 select-none shadow-xs flex items-center justify-center cursor-pointer ${
+          isSelected ? 'ring-2 ring-indigo-600 scale-105 shadow-md' : 'hover:scale-102 hover:shadow'
+        }`;
+        btn.style.backgroundColor = sub.bg;
+        btn.style.color = sub.text;
+        btn.style.border = `1.5px solid ${sub.border}`;
+        btn.innerText = sub.name;
+
+        if (AppState.isDeleteSubjectMode) {
+          const badge = document.createElement('span');
+          badge.className = 'absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow pointer-events-none';
+          badge.innerHTML = '&times;';
+          btn.appendChild(badge);
+        }
+
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (AppState.isDeleteSubjectMode) {
+            deleteSubject(sub.id);
+          } else {
+            selectSubject(sub);
+          }
+        });
+
+        btn.addEventListener('dragstart', (e) => {
+          if (AppState.isDeleteSubjectMode) {
+            e.preventDefault();
+            return;
+          }
+          e.dataTransfer.setData('text/plain', JSON.stringify(sub));
+          btn.classList.add('dragging');
+        });
+
+        btn.addEventListener('dragend', () => {
+          btn.classList.remove('dragging');
+        });
+
+        container.appendChild(btn);
+      });
+
+      updateSelectionDisplay();
+    }
+
+    function selectSubject(sub) {
+      if (AppState.currentSelectedSubject && AppState.currentSelectedSubject.id === sub.id) {
+        AppState.currentSelectedSubject = null;
+      } else {
+        AppState.currentSelectedSubject = sub;
+      }
+      renderSubjectPalette();
+    }
+
+    function updateSelectionDisplay() {
+      const badgeContainer = document.getElementById('current-selected-badge');
+      if (!badgeContainer) return;
+      if (AppState.currentSelectedSubject) {
+        badgeContainer.innerHTML = `
+          <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold border" style="background-color: ${AppState.currentSelectedSubject.bg}; color: ${AppState.currentSelectedSubject.text}; border-color: ${AppState.currentSelectedSubject.border}">
+            ${AppState.currentSelectedSubject.name}
+          </span>
+          <span class="text-slate-500 font-medium text-xs">(點擊課表格子放入)</span>
+        `;
+      } else {
+        badgeContainer.innerHTML = `<span class="text-slate-400">尚未選擇（點擊下方領域卡片）</span>`;
+      }
+    }
+
+    function deleteSubject(subjectId) {
+      AppState.subjects = AppState.subjects.filter(s => s.id !== subjectId);
+      if (AppState.currentSelectedSubject && AppState.currentSelectedSubject.id === subjectId) {
+        AppState.currentSelectedSubject = null;
+      }
+      renderSubjectPalette();
+    }
+
+    function renderScheduleGrid() {
+      const tbody = document.getElementById('schedule-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      // 1. Clothing Row
+      const clothingTr = document.createElement('tr');
+      clothingTr.className = 'hover:bg-slate-50/50 transition-colors border-b border-slate-100';
+      
+      let clothingTd = `
+        <td class="py-3 px-2 font-bold text-slate-700 bg-slate-50/70 border-r border-slate-100">
+          <div class="flex items-center justify-center space-x-1">
+            <i data-lucide="shirt" class="w-4 h-4 text-indigo-500"></i>
+            <span>穿著</span>
+          </div>
+        </td>
+      `;
+
+      for (let day = 1; day <= 5; day++) {
+        const clothingName = AppState.clothing[day];
+        const matchedClothing = AppState.clothingTypes.find(c => c.name === clothingName);
+
+        if (clothingName && matchedClothing) {
+          clothingTd += `
+            <td class="py-2.5 px-2 border-r border-slate-100 last:border-r-0 align-middle">
+              <div onclick="openClothingPicker(${day})" class="schedule-badge-outer shadow-xs hover:opacity-90 transition-all cursor-pointer"
+                   style="background-color: ${matchedClothing.bg}; border-color: ${matchedClothing.border}; height: 38px;">
+                <div class="schedule-badge-inner" style="color: ${matchedClothing.text};">
+                  ${matchedClothing.name}
+                </div>
+              </div>
+            </td>
+          `;
+        } else if (clothingName) {
+          clothingTd += `
+            <td class="py-2.5 px-2 border-r border-slate-100 last:border-r-0 align-middle">
+              <div onclick="openClothingPicker(${day})" class="schedule-badge-outer bg-emerald-100 border-emerald-200 shadow-xs hover:opacity-90 transition-all cursor-pointer" style="height: 38px;">
+                <div class="schedule-badge-inner text-emerald-800">
+                  ${clothingName}
+                </div>
+              </div>
+            </td>
+          `;
+        } else {
+          clothingTd += `
+            <td class="py-2.5 px-2 border-r border-slate-100 last:border-r-0 align-middle">
+              <div onclick="openClothingPicker(${day})" class="schedule-badge-outer border-dashed border-slate-200 hover:border-slate-300 transition-colors cursor-pointer" style="height: 38px; background: transparent;">
+                <div class="schedule-badge-inner text-slate-300 hover:text-slate-500 font-normal">
+                  + 選穿著
+                </div>
+              </div>
+            </td>
+          `;
+        }
+      }
+      clothingTr.innerHTML = clothingTd;
+      tbody.appendChild(clothingTr);
+
+      // 2. Period Rows
+      AppState.periods.forEach(period => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/40 transition-colors border-b border-slate-100 last:border-b-0';
+
+        const periodHeaderTd = document.createElement('td');
+        periodHeaderTd.className = 'py-3 px-2 bg-slate-50/70 border-r border-slate-100 align-middle select-none';
+
+        let iconHtml = '<i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-500 inline mr-1"></i>';
+        if (period.icon === 'sun') {
+          iconHtml = '<i data-lucide="sun" class="w-3.5 h-3.5 text-amber-500 inline mr-1"></i>';
+        } else if (period.icon === 'utensils') {
+          iconHtml = '<i data-lucide="utensils" class="w-3.5 h-3.5 text-emerald-600 inline mr-1"></i>';
+        }
+
+        periodHeaderTd.innerHTML = `
+          <div class="font-bold text-slate-700 flex items-center justify-center leading-normal">
+            ${iconHtml}<span>${period.name}</span>
+          </div>
+          <div class="text-[11px] text-slate-400 font-mono mt-1 leading-normal whitespace-nowrap">${period.startTime} - ${period.endTime}</div>
+        `;
+        tr.appendChild(periodHeaderTd);
+
+        for (let day = 1; day <= 5; day++) {
+          const cellKey = `${period.id}-${day}`;
+          const currentVal = AppState.grid[cellKey] || '';
+          const cellTd = document.createElement('td');
+          cellTd.className = 'py-2 px-1.5 sm:px-2 border-r border-slate-100 last:border-r-0 h-16 align-middle relative transition-colors cursor-pointer';
+          cellTd.dataset.cellKey = cellKey;
+
+          // Special: Lunch & Nap Period (午餐午休時段留白)
+          if (period.id === 'p-lunch' || period.type === 'break') {
+            const blankTd = document.createElement('td');
+            blankTd.className = 'py-2 px-1.5 sm:px-2 border-r border-slate-100 last:border-r-0 h-14 bg-slate-50/40 select-none';
+            tr.appendChild(blankTd);
+            continue;
+          }
+
+          // Special: Morning Activity Input
+          if (period.id === 'p-morning' || period.type === 'morning') {
+            const hasVal = Boolean(currentVal);
+            cellTd.innerHTML = `
+              <div class="schedule-badge-outer ${hasVal ? 'bg-amber-50/80 border-amber-200' : 'bg-transparent border-dashed border-slate-200'}" style="height: 42px;">
+                <div class="schedule-badge-inner p-0">
+                  <input type="text" value="${currentVal}" placeholder="+ 自訂活動" title="點擊直接輸入晨間活動"
+                         class="morning-input-el w-full h-full text-center text-xs sm:text-sm font-bold bg-transparent outline-none ${hasVal ? 'text-amber-900' : 'text-slate-400 placeholder-slate-300'}"
+                         style="line-height: 1;">
+                </div>
+              </div>
+            `;
+
+            const inputEl = cellTd.querySelector('input');
+            inputEl.addEventListener('click', (e) => e.stopPropagation());
+            inputEl.addEventListener('input', (e) => {
+              const val = e.target.value.trim();
+              if (val) {
+                AppState.grid[cellKey] = val;
+              } else {
+                delete AppState.grid[cellKey];
+              }
+            });
+
+            tr.appendChild(cellTd);
+            continue;
+          }
+
+          // Standard Class Subject Cell
+          const currentSubjectName = currentVal;
+          const matchedSubject = AppState.subjects.find(s => s.name === currentSubjectName);
+
+          if (currentSubjectName && matchedSubject) {
+            cellTd.innerHTML = `
+              <div title="點擊清除" class="schedule-badge-outer shadow-xs transition-transform hover:scale-95 cursor-pointer"
+                   style="background-color: ${matchedSubject.bg}; border-color: ${matchedSubject.border}; height: 42px;">
+                <div class="schedule-badge-inner" style="color: ${matchedSubject.text};">
+                  ${matchedSubject.name}
+                </div>
+              </div>
+            `;
+          } else if (currentSubjectName) {
+            cellTd.innerHTML = `
+              <div title="點擊清除" class="schedule-badge-outer bg-slate-100 border-slate-200 shadow-xs cursor-pointer" style="height: 42px;">
+                <div class="schedule-badge-inner text-slate-700">
+                  ${currentSubjectName}
+                </div>
+              </div>
+            `;
+          } else {
+            cellTd.innerHTML = `
+              <div class="w-full max-w-[110px] mx-auto h-[42px] flex items-center justify-center text-slate-200 hover:text-slate-400 text-lg font-light select-none">
+                +
+              </div>
+            `;
+          }
+
+          cellTd.addEventListener('click', () => {
+            if (AppState.currentSelectedSubject) {
+              AppState.grid[cellKey] = AppState.currentSelectedSubject.name;
+            } else {
+              if (AppState.grid[cellKey]) {
+                delete AppState.grid[cellKey];
+              }
+            }
+            renderScheduleGrid();
+          });
+
+          cellTd.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            cellTd.classList.add('drag-over');
+          });
+          cellTd.addEventListener('dragleave', () => {
+            cellTd.classList.remove('drag-over');
+          });
+          cellTd.addEventListener('drop', (e) => {
+            e.preventDefault();
+            cellTd.classList.remove('drag-over');
+            try {
+              const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+              if (data && data.name) {
+                AppState.grid[cellKey] = data.name;
+                renderScheduleGrid();
+              }
+            } catch (err) {
+              console.error(err);
+            }
+          });
+
+          tr.appendChild(cellTd);
+        }
+
+        tbody.appendChild(tr);
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function showConfirmDialog(title, message, onConfirm) {
+      const modal = document.getElementById('modal-confirm');
+      document.getElementById('confirm-modal-title').innerText = title;
+      document.getElementById('confirm-modal-msg').innerText = message;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      
+      const okBtn = document.getElementById('btn-confirm-ok');
+      const cancelBtn = document.getElementById('btn-confirm-cancel');
+      
+      const handleOk = () => {
+        cleanup();
+        onConfirm();
+      };
+      const handleCancel = () => {
+        cleanup();
+      };
+      const cleanup = () => {
+        okBtn.removeEventListener('click', handleOk);
+        cancelBtn.removeEventListener('click', handleCancel);
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      };
+      okBtn.addEventListener('click', handleOk);
+      cancelBtn.addEventListener('click', handleCancel);
+    }
+
+    function initClothingColorPalettes() {
+      const group = document.getElementById('clothing-color-palette-group');
+      if (!group) return;
+      group.innerHTML = '';
+      PRESET_COLOR_PALETTES.forEach((palette) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `py-1 px-1.5 rounded-lg border text-[11px] font-bold text-center transition-all cursor-pointer ${
+          AppState.selectedClothingColor.key === palette.key ? 'ring-2 ring-indigo-500 scale-105 shadow-xs' : 'opacity-85 hover:opacity-100'
+        }`;
+        b.style.backgroundColor = palette.bg;
+        b.style.color = palette.text;
+        b.style.borderColor = palette.border;
+        b.innerText = palette.label;
+        b.onclick = () => {
+          AppState.selectedClothingColor = palette;
+          initClothingColorPalettes();
+        };
+        group.appendChild(b);
+      });
+    }
+
+    function renderClothingOptions() {
+      const container = document.getElementById('clothing-options-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      AppState.clothingTypes.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'w-full py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all hover:scale-102 flex items-center justify-center shadow-xs cursor-pointer';
+        btn.style.backgroundColor = c.bg;
+        btn.style.color = c.text;
+        btn.style.borderColor = c.border;
+        btn.innerText = c.name;
+        btn.onclick = () => {
+          if (AppState.activeClothingDay) {
+            AppState.clothing[AppState.activeClothingDay] = c.name;
+            renderScheduleGrid();
+            closeClothingPicker();
+          }
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function renderClothingManageList() {
+      const listContainer = document.getElementById('clothing-manage-list');
+      if (!listContainer) return;
+      listContainer.innerHTML = '';
+
+      AppState.clothingTypes.forEach(cloth => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white text-xs';
+        
+        row.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="w-5 h-5 rounded-lg border flex items-center justify-center font-bold text-[10px]" style="background-color: ${cloth.bg}; color: ${cloth.text}; border-color: ${cloth.border}">衣</span>
+            <input type="text" value="${cloth.name}" data-id="${cloth.id}" class="edit-clothing-name font-bold text-slate-700 outline-none border-b border-transparent focus:border-indigo-500 bg-transparent px-1 py-0.5 w-24">
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <select data-id="${cloth.id}" class="edit-clothing-color-select bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-600 font-medium">
+              ${PRESET_COLOR_PALETTES.map(p => `
+                <option value="${p.key}" ${cloth.text === p.text ? 'selected' : ''}>${p.label}</option>
+              `).join('')}
+            </select>
+            <button data-id="${cloth.id}" class="btn-delete-clothing text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        `;
+
+        const nameInput = row.querySelector('.edit-clothing-name');
+        nameInput.addEventListener('change', (e) => {
+          cloth.name = e.target.value.trim() || cloth.name;
+          renderClothingOptions();
+          renderScheduleGrid();
+        });
+
+        const colorSelect = row.querySelector('.edit-clothing-color-select');
+        colorSelect.addEventListener('change', (e) => {
+          const selected = PRESET_COLOR_PALETTES.find(p => p.key === e.target.value);
+          if (selected) {
+            cloth.bg = selected.bg;
+            cloth.text = selected.text;
+            cloth.border = selected.border;
+            renderClothingManageList();
+            renderClothingOptions();
+            renderScheduleGrid();
+          }
+        });
+
+        const deleteBtn = row.querySelector('.btn-delete-clothing');
+        deleteBtn.addEventListener('click', () => {
+          AppState.clothingTypes = AppState.clothingTypes.filter(c => c.id !== cloth.id);
+          renderClothingManageList();
+          renderClothingOptions();
+          renderScheduleGrid();
+        });
+
+        listContainer.appendChild(row);
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function openClothingPicker(day) {
+      AppState.activeClothingDay = day;
+      const dayNames = ['', '星期一', '星期二', '星期三', '星期四', '星期五'];
+      document.getElementById('clothing-modal-day-title').innerText = `設定「${dayNames[day]}」穿著`;
+      renderClothingOptions();
+      initClothingColorPalettes();
+      renderClothingManageList();
+      switchClothingTab('select');
+
+      const modal = document.getElementById('modal-clothing-picker');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeClothingPicker() {
+      AppState.activeClothingDay = null;
+      const modal = document.getElementById('modal-clothing-picker');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function switchClothingTab(tab) {
+      const selectView = document.getElementById('view-clothing-select');
+      const manageView = document.getElementById('view-clothing-manage');
+      const tabSelect = document.getElementById('tab-clothing-select');
+      const tabManage = document.getElementById('tab-clothing-manage');
+
+      if (tab === 'select') {
+        selectView.classList.remove('hidden');
+        manageView.classList.add('hidden');
+        tabSelect.className = 'px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200';
+        tabManage.className = 'px-2.5 py-1 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100';
+      } else {
+        selectView.classList.add('hidden');
+        manageView.classList.remove('hidden');
+        tabManage.className = 'px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200';
+        tabSelect.className = 'px-2.5 py-1 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100';
+      }
+    }
+
+    function renderPeriodsEditor() {
+      const container = document.getElementById('periods-editor-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      AppState.periods.forEach((p, idx) => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-50 p-3 rounded-2xl border border-slate-200 text-xs space-y-2.5';
+        card.innerHTML = `
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center space-x-2">
+              <span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[11px]">${idx + 1}</span>
+              <input type="text" class="period-name font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 w-24 outline-none focus:ring-1 focus:ring-indigo-500" value="${p.name}">
+            </div>
+            <div class="flex items-center space-x-1.5">
+              <span class="text-slate-400">時間：</span>
+              <input type="time" class="period-start bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono text-slate-600 outline-none" value="${p.startTime}">
+              <span class="text-slate-400">至</span>
+              <input type="time" class="period-end bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono text-slate-600 outline-none" value="${p.endTime}">
+            </div>
+          </div>
+          
+          <div class="pt-2 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+            <div>
+              <label class="block text-slate-500 font-medium mb-1 flex items-center space-x-1">
+                <i data-lucide="book-open" class="w-3 h-3 text-emerald-600 inline"></i>
+                <span>上課中提示語：</span>
+              </label>
+              <input type="text" class="period-in-class-msg w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 outline-none focus:ring-1 focus:ring-emerald-500" value="${p.inClassMsg || '請保持安靜，認真聽講並主動思考'}" placeholder="例如：請保持安靜，認真聽講">
+            </div>
+            <div>
+              <label class="block text-slate-500 font-medium mb-1 flex items-center space-x-1">
+                <i data-lucide="coffee" class="w-3 h-3 text-sky-600 inline"></i>
+                <span>下課休息提示語：</span>
+              </label>
+              <input type="text" class="period-break-msg w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 outline-none focus:ring-1 focus:ring-sky-500" value="${p.breakMsg || '下課請喝水、上廁所，讓眼睛好好休息一下'}" placeholder="例如：下課請喝水、上廁所">
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function savePeriodsFromEditor() {
+      const container = document.getElementById('periods-editor-list');
+      if (!container) return;
+      const cards = container.children;
+      for (let i = 0; i < cards.length; i++) {
+        const nameInput = cards[i].querySelector('.period-name');
+        const startInput = cards[i].querySelector('.period-start');
+        const endInput = cards[i].querySelector('.period-end');
+        const inClassInput = cards[i].querySelector('.period-in-class-msg');
+        const breakInput = cards[i].querySelector('.period-break-msg');
+        
+        if (AppState.periods[i]) {
+          AppState.periods[i].name = nameInput.value.trim() || AppState.periods[i].name;
+          AppState.periods[i].startTime = startInput.value;
+          AppState.periods[i].endTime = endInput.value;
+          AppState.periods[i].inClassMsg = inClassInput.value.trim() || '請保持安靜，認真聽講並主動思考';
+          AppState.periods[i].breakMsg = breakInput.value.trim() || '下課請喝水、上廁所，讓眼睛好好休息一下';
+        }
+      }
+      renderScheduleGrid();
+      const modal = document.getElementById('modal-periods');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function renderClassroomsEditor() {
+      const container = document.getElementById('classrooms-editor-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      AppState.subjects.forEach(sub => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs';
+        row.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="w-3 h-3 rounded-full" style="background-color: ${sub.text}"></span>
+            <span class="font-bold text-slate-700">${sub.name}</span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <label class="text-slate-400">上課地點：</label>
+            <input type="text" data-subject-id="${sub.id}" value="${sub.room || '原班教室'}" class="subject-room-input bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 font-medium text-xs w-36 outline-none focus:ring-1 focus:ring-indigo-500">
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function saveClassroomsFromEditor() {
+      const inputs = document.querySelectorAll('.subject-room-input');
+      inputs.forEach(inp => {
+        const subId = inp.dataset.subjectId;
+        const target = AppState.subjects.find(s => s.id === subId);
+        if (target) {
+          target.room = inp.value.trim() || '原班教室';
+        }
+      });
+      const modal = document.getElementById('modal-classrooms');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function renderSubjectMessagesEditor() {
+      const container = document.getElementById('subject-messages-editor-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      AppState.subjects.forEach(sub => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs space-y-2';
+        
+        card.innerHTML = `
+          <div class="flex items-center space-x-2 pb-1.5 border-b border-slate-200/70">
+            <span class="px-2.5 py-0.5 rounded-lg font-bold text-xs border" style="background-color: ${sub.bg}; color: ${sub.text}; border-color: ${sub.border}">
+              ${sub.name}
+            </span>
+            <span class="text-slate-400 text-[11px]">上課地點：${sub.room || '原班教室'}</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+            <div>
+              <label class="block text-slate-600 font-semibold mb-1 flex items-center space-x-1">
+                <i data-lucide="backpack" class="w-3.5 h-3.5 text-amber-600 inline"></i>
+                <span>上課前提示 (準備用品/集合叮嚀)：</span>
+              </label>
+              <input type="text" data-subject-id="${sub.id}" class="subject-pre-msg w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 outline-none focus:ring-1 focus:ring-amber-500" value="${sub.preMsg || `請攜帶 ${sub.name} 課本、學用品及水壺前往！`}" placeholder="例如：請攜帶課本、直笛">
+            </div>
+            <div>
+              <label class="block text-slate-600 font-semibold mb-1 flex items-center space-x-1">
+                <i data-lucide="volume-x" class="w-3.5 h-3.5 text-emerald-600 inline"></i>
+                <span>上課中提示 (專注/活動提示)：</span>
+              </label>
+              <input type="text" data-subject-id="${sub.id}" class="subject-in-msg w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 outline-none focus:ring-1 focus:ring-emerald-500" value="${sub.inMsg || '請保持安靜，認真聽講並主動思考'}" placeholder="例如：請保持安靜、注意安全">
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function saveSubjectMessagesFromEditor() {
+      const container = document.getElementById('subject-messages-editor-list');
+      if (!container) return;
+      const cards = container.children;
+      for (let i = 0; i < cards.length; i++) {
+        const preInput = cards[i].querySelector('.subject-pre-msg');
+        const inInput = cards[i].querySelector('.subject-in-msg');
+        if (preInput && inInput) {
+          const subId = preInput.dataset.subjectId;
+          const target = AppState.subjects.find(s => s.id === subId);
+          if (target) {
+            target.preMsg = preInput.value.trim() || `請攜帶 ${target.name} 課本、學用品及水壺前往！`;
+            target.inMsg = inInput.value.trim() || '請保持安靜，認真聽講並主動思考';
+          }
+        }
+      }
+      const modal = document.getElementById('modal-subject-messages');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    let selectedColorPalette = PRESET_COLOR_PALETTES[0];
+
+    function initColorPickerGroup() {
+      const group = document.getElementById('color-picker-group');
+      if (!group) return;
+      group.innerHTML = '';
+      PRESET_COLOR_PALETTES.forEach((palette, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `py-1 px-1 rounded-lg border text-xs font-bold transition-transform cursor-pointer ${i === 0 ? 'ring-2 ring-indigo-500 scale-105 shadow-sm' : ''}`;
+        b.style.backgroundColor = palette.bg;
+        b.style.color = palette.text;
+        b.style.borderColor = palette.border;
+        b.innerText = palette.label;
+        b.onclick = () => {
+          selectedColorPalette = palette;
+          group.querySelectorAll('button').forEach(btn => btn.className = 'py-1 px-1 rounded-lg border text-xs font-bold transition-transform cursor-pointer');
+          b.className = 'py-1 px-1 rounded-lg border text-xs font-bold transition-transform ring-2 ring-indigo-500 scale-105 shadow-sm cursor-pointer';
+        };
+        group.appendChild(b);
+      });
+    }
+
+    let toneStarted = false;
+    async function playSchoolBell() {
+      if (!AppState.reminderSound) return;
+      try {
+        if (!toneStarted) {
+          await Tone.start();
+          toneStarted = true;
+        }
+        const synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.05, decay: 0.8, sustain: 0.3, release: 1.2 }
+        }).toDestination();
+        
+        const now = Tone.now();
+        synth.triggerAttackRelease("C5", "8n", now);
+        synth.triggerAttackRelease("E5", "8n", now + 0.35);
+        synth.triggerAttackRelease("G5", "8n", now + 0.70);
+        synth.triggerAttackRelease("C6", "4n", now + 1.05);
+      } catch (e) {
+        console.warn('Tone sound play bypassed:', e);
+      }
+    }
+
+    function parseTimeToSeconds(timeStr) {
+      if (!timeStr) return 0;
+      const [h, m] = timeStr.split(':').map(Number);
+      return (h * 3600) + (m * 60);
+    }
+
+    function getEffectiveTime() {
+      if (AppState.simulatedMode && AppState.simulatedDate) {
+        return new Date(AppState.simulatedDate);
+      }
+      return new Date();
+    }
+
+    function updateReminderBoard() {
+      const now = getEffectiveTime();
+      const currentDay = now.getDay();
+      const currentHours = String(now.getHours()).padStart(2, '0');
+      const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+      const currentSeconds = String(now.getSeconds()).padStart(2, '0');
+      const currentTimeInSecs = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+      const clockEl = document.getElementById('board-live-clock');
+      if (clockEl) clockEl.innerText = `${currentHours}:${currentMinutes}:${currentSeconds}`;
+      
+      const dayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+      const dateEl = document.getElementById('board-live-date');
+      if (dateEl) dateEl.innerText = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${dayNames[currentDay]}`;
+      
+      const infoEl = document.getElementById('reminder-class-info');
+      if (infoEl) infoEl.innerText = `${AppState.scheduleTitle} │ ${AppState.scheduleSubtitle}`;
+
+      const container = document.getElementById('board-status-container');
+      if (!container) return;
+
+      if (currentDay < 1 || currentDay > 5) {
+        container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
+        container.innerHTML = `
+          <div class="py-6">
+            <div class="w-16 h-16 bg-slate-800 text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i data-lucide="coffee" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-slate-200 mb-2">週末假期愉快！</h3>
+            <p class="text-slate-400 text-sm">目前非上課日，請好好放鬆休息，做好下週準備。</p>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      let currentPeriod = null;
+      let nextPeriod = null;
+      let secondsToNext = 999999;
+
+      const periodsSorted = [...AppState.periods].sort((a, b) => {
+        return parseTimeToSeconds(a.startTime) - parseTimeToSeconds(b.startTime);
+      });
+
+      for (let i = 0; i < periodsSorted.length; i++) {
+        const p = periodsSorted[i];
+        const pStartSec = parseTimeToSeconds(p.startTime);
+        const pEndSec = parseTimeToSeconds(p.endTime);
+
+        if (currentTimeInSecs >= pStartSec && currentTimeInSecs < pEndSec) {
+          currentPeriod = p;
+          if (i + 1 < periodsSorted.length) {
+            nextPeriod = periodsSorted[i + 1];
+          }
+          break;
+        }
+
+        if (currentTimeInSecs < pStartSec) {
+          nextPeriod = p;
+          secondsToNext = pStartSec - currentTimeInSecs;
+          break;
+        }
+      }
+
+      const lastPeriod = periodsSorted[periodsSorted.length - 1];
+      const lastPeriodEndSec = parseTimeToSeconds(lastPeriod.endTime);
+
+      if (!currentPeriod && !nextPeriod && currentTimeInSecs >= lastPeriodEndSec) {
+        container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
+        container.innerHTML = `
+          <div class="py-6">
+            <div class="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i data-lucide="check-circle" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-slate-100 mb-2">今日課程已圓滿結束！</h3>
+            <p class="text-slate-400 text-sm">請整理書包與座位，注意回家路途安全。</p>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      // SCENARIO 1: Lunch Break
+      if (currentPeriod && (currentPeriod.type === 'break' || currentPeriod.id === 'p-lunch')) {
+        const leadSecLimit = AppState.leadMinutes * 60;
+        const pEndSec = parseTimeToSeconds(currentPeriod.endTime);
+        const secsUntilAfternoonClass = pEndSec - currentTimeInSecs;
+
+        if (secsUntilAfternoonClass > leadSecLimit || !nextPeriod) {
+          const startSec = parseTimeToSeconds(currentPeriod.startTime);
+          const totalDuration = pEndSec - startSec;
+          const elapsed = currentTimeInSecs - startSec;
+          const progressPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
+          const remainMins = Math.ceil(secsUntilAfternoonClass / 60);
+
+          container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
+          container.innerHTML = `
+            <div class="flex flex-col items-center">
+              <div class="inline-flex items-center space-x-2.5 px-5 py-2 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-sm font-bold mb-4 shadow-sm">
+                <i data-lucide="utensils" class="w-4 h-4 text-emerald-400"></i>
+                <span>午餐午休時間</span>
+              </div>
+
+              <div class="text-slate-400 text-sm mb-1">${currentPeriod.name} (${currentPeriod.startTime} - ${currentPeriod.endTime})</div>
+              <h3 class="text-4xl sm:text-5xl font-black text-white tracking-wide mb-4">用餐與安靜休養</h3>
+
+              <div class="flex items-center justify-center space-x-3 text-slate-100 text-base sm:text-xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-6 shadow-md">
+                <i data-lucide="sparkles" class="w-5 h-5 text-amber-400 shrink-0"></i>
+                <span class="text-slate-200 font-semibold">${currentPeriod.inClassMsg || '用餐細嚼慢嚥，午休保持教室安靜'}</span>
+              </div>
+
+              <div class="w-full max-w-md bg-slate-800/60 p-4 rounded-2xl border border-slate-800">
+                <div class="flex justify-between text-xs text-slate-400 mb-2">
+                  <span>距離下午上課還有：<strong class="text-amber-300 font-bold font-mono text-sm">${remainMins} 分鐘</strong></span>
+                  <span>進度 ${progressPercent}%</span>
+                </div>
+                <div class="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                  <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
+                </div>
+              </div>
+            </div>
+          `;
+          if (window.lucide) lucide.createIcons();
+          return;
+        }
+      }
+
+      // SCENARIO 2: In Class (Non-blinking stable badge)
+      if (currentPeriod && currentPeriod.type !== 'break') {
+        container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
+        const cellKey = `${currentPeriod.id}-${currentDay}`;
+        const subjectName = AppState.grid[cellKey] || '自習 / 彈性';
+        const matchedSubject = AppState.subjects.find(s => s.name === subjectName);
+        
+        const startSec = parseTimeToSeconds(currentPeriod.startTime);
+        const endSec = parseTimeToSeconds(currentPeriod.endTime);
+        const totalDuration = endSec - startSec;
+        const elapsed = currentTimeInSecs - startSec;
+        const remainMins = Math.ceil((endSec - currentTimeInSecs) / 60);
+        const progressPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
+        const inClassText = (matchedSubject && matchedSubject.inMsg) || currentPeriod.inClassMsg || '請保持安靜，認真聽講並主動思考';
+
+        container.innerHTML = `
+          <div class="flex flex-col items-center">
+            <div class="inline-flex items-center space-x-2.5 px-5 py-2 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-sm font-bold mb-4 shadow-sm">
+              <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+              <span>上課中 │ 請專心上課</span>
+            </div>
+
+            <div class="text-slate-400 text-sm mb-1">${currentPeriod.name} (${currentPeriod.startTime} - ${currentPeriod.endTime})</div>
+            <h3 class="text-4xl sm:text-5xl font-black text-white tracking-wide mb-4">${subjectName}</h3>
+            
+            <div class="flex items-center justify-center space-x-3 text-slate-100 text-lg sm:text-2xl font-bold bg-slate-800/90 px-6 py-3.5 rounded-2xl border border-slate-700/80 mb-6 shadow-md">
+              <i data-lucide="volume-x" class="w-6 h-6 text-emerald-400 shrink-0"></i>
+              <span class="text-white font-extrabold">${inClassText}</span>
+            </div>
+
+            <div class="w-full max-w-md bg-slate-800/60 p-4 rounded-2xl border border-slate-800">
+              <div class="flex justify-between text-xs text-slate-400 mb-2">
+                <span>距離下課還有：<strong class="text-amber-300 font-bold font-mono text-sm">${remainMins} 分鐘</strong></span>
+                <span>進度 ${progressPercent}%</span>
+              </div>
+              <div class="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      // SCENARIO 3: Recess, Pre-class Notice, or Red Alert
+      if (nextPeriod) {
+        const cellKey = `${nextPeriod.id}-${currentDay}`;
+        const nextSubjectName = AppState.grid[cellKey] || '自習 / 彈性';
+        const matchedSubject = AppState.subjects.find(s => s.name === nextSubjectName);
+        const classroom = matchedSubject ? matchedSubject.room : '原班教室';
+
+        const leadSecLimit = AppState.leadMinutes * 60;
+        const warningSecLimit = (AppState.warningMinutes || 1) * 60;
+        const isWithinLeadTime = secondsToNext <= leadSecLimit;
+        const isWithinWarningTime = secondsToNext <= warningSecLimit;
+        
+        const breakText = nextPeriod.breakMsg || '下課請喝水、上廁所，讓眼睛好好休息一下';
+        const preClassSubjectMsg = (matchedSubject && matchedSubject.preMsg) || `請攜帶 ${nextSubjectName} 課本、學用品及水壺前往！`;
+
+        const minsLeft = Math.floor(secondsToNext / 60);
+        const secsLeft = secondsToNext % 60;
+        const countdownStr = minsLeft > 0 ? `${minsLeft}分${secsLeft > 0 ? secsLeft + '秒' : ''}` : `${secsLeft}秒`;
+
+        if (isWithinLeadTime && (!AppState.lastChimeTimestamp || Date.now() - AppState.lastChimeTimestamp > 60000)) {
+          playSchoolBell();
+          AppState.lastChimeTimestamp = Date.now();
+        }
+
+        // RED WARNING ALERT MODE
+        if (isWithinWarningTime) {
+          container.className = 'w-full max-w-2xl bg-rose-950/90 border-2 border-rose-500 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500 shadow-rose-950/50';
+          
+          const isHomeClassroom = classroom.includes('原班教室') || classroom === '原班';
+          const warningDetailMsg = isHomeClassroom
+            ? (AppState.warningMsgHome || '請於上課鐘響前就坐，並備妥學用品，準備上課!!')
+            : (AppState.warningMsgOutside || '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!');
+
+          container.innerHTML = `
+            <div class="flex flex-col items-center animate-soft-pulse">
+              <div class="inline-flex items-center space-x-2 px-5 py-2 rounded-full bg-rose-600 border border-rose-400 text-white text-sm sm:text-base font-black mb-4 shadow-lg">
+                <i data-lucide="alert-octagon" class="w-5 h-5 text-amber-300"></i>
+                <span>即將上課警示 (倒數 ${countdownStr})</span>
+              </div>
+
+              <div class="text-rose-200 text-sm mb-1">下一節：${nextPeriod.name} (${nextPeriod.startTime} 準時上課)</div>
+              <h3 class="text-4xl sm:text-5xl font-black text-rose-200 tracking-wide mb-3">${nextSubjectName}</h3>
+
+              <div class="w-full max-w-lg bg-rose-900/50 border-2 border-rose-400/80 p-5 rounded-2xl text-left mb-5 shadow-md">
+                <div class="flex items-center space-x-3.5">
+                  <div class="p-2.5 bg-rose-500 text-white rounded-xl shrink-0">
+                    <i data-lucide="map-pin" class="w-6 h-6"></i>
+                  </div>
+                  <div class="flex-1">
+                    <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1">
+                      <span class="text-xs sm:text-sm text-rose-200 font-bold">上課地點：</span>
+                      <strong class="text-2xl sm:text-3xl font-black text-white tracking-wide">${classroom}</strong>
+                    </div>
+                    <p class="text-xs sm:text-sm text-rose-100 mt-2">${preClassSubjectMsg}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="text-xs sm:text-sm font-bold text-white bg-rose-700/80 px-5 py-2.5 rounded-xl border border-rose-400/60 flex items-center space-x-2 shadow-sm text-center">
+                <i data-lucide="bell-ring" class="w-4 h-4 text-amber-300 shrink-0"></i>
+                <span>${warningDetailMsg}</span>
+              </div>
+            </div>
+          `;
+        }
+        // YELLOW PRE-CLASS NOTICE MODE
+        else if (isWithinLeadTime) {
+          container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
+          container.innerHTML = `
+            <div class="flex flex-col items-center animate-soft-pulse">
+              <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-300 text-sm font-bold mb-4">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                <span>即將上課叮嚀 (倒數 ${countdownStr})</span>
+              </div>
+
+              <div class="text-slate-400 text-sm mb-1">下一節：${nextPeriod.name} (${nextPeriod.startTime} 準時上課)</div>
+              <h3 class="text-4xl sm:text-5xl font-black text-amber-300 tracking-wide mb-3">${nextSubjectName}</h3>
+
+              <div class="w-full max-w-lg bg-amber-500/10 border-2 border-amber-500/40 p-5 rounded-2xl text-left mb-5">
+                <div class="flex items-center space-x-3.5">
+                  <div class="p-2.5 bg-amber-500 text-slate-950 rounded-xl shrink-0">
+                    <i data-lucide="map-pin" class="w-6 h-6"></i>
+                  </div>
+                  <div class="flex-1">
+                    <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1">
+                      <span class="text-xs sm:text-sm text-amber-200/90 font-medium">上課地點：</span>
+                      <strong class="text-2xl sm:text-3xl font-black text-white tracking-wide">${classroom}</strong>
+                    </div>
+                    <p class="text-xs sm:text-sm text-amber-200/90 mt-2">${preClassSubjectMsg}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="text-xs sm:text-sm font-semibold text-amber-200 bg-amber-950/40 px-4 py-2 rounded-xl border border-amber-800/40 flex items-center space-x-1.5">
+                <i data-lucide="bell" class="w-4 h-4 text-amber-400"></i>
+                <span>上課鐘響時請趕快就座，準備上課</span>
+              </div>
+            </div>
+          `;
+        }
+        // REGULAR BREAK TIME MODE
+        else {
+          container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
+          container.innerHTML = `
+            <div class="flex flex-col items-center">
+              <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-sky-500/20 border border-sky-500/40 text-sky-300 text-sm font-bold mb-4">
+                <i data-lucide="coffee" class="w-4 h-4"></i>
+                <span>下課休息時間 (距離下節還有 ${Math.ceil(secondsToNext / 60)} 分鐘)</span>
+              </div>
+
+              <div class="text-slate-400 text-xs sm:text-sm mb-1">下一節課為 ${nextPeriod.name} (${nextPeriod.startTime})</div>
+              <h3 class="text-3xl sm:text-4xl font-extrabold text-white tracking-wide mb-3">${nextSubjectName}</h3>
+
+              <div class="flex items-center justify-center space-x-3 text-slate-100 text-lg sm:text-2xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-5 shadow-md">
+                <i data-lucide="map-pin" class="w-6 h-6 text-indigo-400 shrink-0"></i>
+                <span>上課地點：<strong class="text-white font-extrabold">${classroom}</strong></span>
+              </div>
+
+              <p class="text-slate-300 text-xs sm:text-sm bg-slate-800/60 px-4 py-2 rounded-xl border border-slate-700/40 flex items-center space-x-1.5">
+                <i data-lucide="sparkles" class="w-4 h-4 text-sky-400"></i>
+                <span>${breakText}</span>
+              </p>
+            </div>
+          `;
+        }
+
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+
+    function initApp() {
+      renderSubjectPalette();
+      renderScheduleGrid();
+      initClothingColorPalettes();
+      initColorPickerGroup();
+
+      // Titles input sync
+      const titleInput = document.getElementById('input-schedule-title');
+      const subtitleInput = document.getElementById('input-schedule-subtitle');
+      const titleDisplay = document.getElementById('display-schedule-title');
+      const subtitleDisplay = document.getElementById('display-schedule-subtitle');
+
+      titleInput.value = AppState.scheduleTitle;
+      subtitleInput.value = AppState.scheduleSubtitle;
+      titleDisplay.innerText = AppState.scheduleTitle;
+      subtitleDisplay.innerText = AppState.scheduleSubtitle;
+
+      titleInput.addEventListener('input', (e) => {
+        AppState.scheduleTitle = e.target.value.trim() || '我的每週課表';
+        titleDisplay.innerText = AppState.scheduleTitle;
+      });
+
+      subtitleInput.addEventListener('input', (e) => {
+        AppState.scheduleSubtitle = e.target.value.trim() || '';
+        subtitleDisplay.innerText = AppState.scheduleSubtitle;
+      });
+
+      // Clear Grid Button
+      document.getElementById('btn-clear-grid').addEventListener('click', () => {
+        showConfirmDialog('清空課表確認', '確定要清空課表內的所有課程與活動填寫嗎？', () => {
+          AppState.grid = {};
+          renderScheduleGrid();
+        });
+      });
+
+      // Export JSON Button
+      document.getElementById('btn-export-json').addEventListener('click', () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(AppState, null, 2));
+        const dlAnchor = document.createElement('a');
+        dlAnchor.setAttribute("href", dataStr);
+        dlAnchor.setAttribute("download", `${AppState.scheduleTitle || '課表'}_備份.json`);
+        document.body.appendChild(dlAnchor);
+        dlAnchor.click();
+        dlAnchor.remove();
+      });
+
+      // Import JSON Triggers
+      const inputImport = document.getElementById('input-import-json');
+      document.getElementById('btn-trigger-import').addEventListener('click', () => {
+        inputImport.click();
+      });
+
+      inputImport.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const imported = JSON.parse(event.target.result);
+            if (imported && imported.grid) {
+              showConfirmDialog('匯入課表確認', '即將載入此課表設定，目前的內容將會被覆蓋，是否繼續？', () => {
+                if (imported.subjects) AppState.subjects = imported.subjects;
+                if (imported.periods) AppState.periods = imported.periods;
+                if (imported.scheduleTitle) AppState.scheduleTitle = imported.scheduleTitle;
+                if (imported.scheduleSubtitle) AppState.scheduleSubtitle = imported.scheduleSubtitle;
+                if (imported.clothingTypes) AppState.clothingTypes = imported.clothingTypes;
+                if (imported.clothing) AppState.clothing = imported.clothing;
+                if (imported.grid) AppState.grid = imported.grid;
+                if (imported.warningMsgHome) AppState.warningMsgHome = imported.warningMsgHome;
+                if (imported.warningMsgOutside) AppState.warningMsgOutside = imported.warningMsgOutside;
+
+                titleInput.value = AppState.scheduleTitle;
+                subtitleInput.value = AppState.scheduleSubtitle;
+                titleDisplay.innerText = AppState.scheduleTitle;
+                subtitleDisplay.innerText = AppState.scheduleSubtitle;
+
+                renderSubjectPalette();
+                renderScheduleGrid();
+                renderClothingOptions();
+                initClothingColorPalettes();
+              });
+            }
+          } catch (err) {
+            console.error(err);
+          }
+          inputImport.value = '';
+        };
+        reader.readAsText(file);
+      });
+
+      // Export PNG with Absolute Geometry & Baseline Compensation Fix
+      document.getElementById('btn-export-png').addEventListener('click', async () => {
+        const target = document.getElementById('schedule-export-wrapper');
+        const btn = document.getElementById('btn-export-png');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline mr-1"></i><span>處理匯出中...</span>`;
+        if (window.lucide) lucide.createIcons();
+
+        try {
+          if (document.fonts && document.fonts.ready) {
+            await document.fonts.ready;
+          }
+        } catch (e) {
+          console.warn('Font load wait bypassed', e);
+        }
+
+        html2canvas(target, {
+          scale: 3,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          onclone: (clonedDoc) => {
+            const wrapper = clonedDoc.getElementById('schedule-export-wrapper');
+            if (wrapper) {
+              wrapper.classList.add('export-rendering-mode');
+              wrapper.style.boxSizing = 'border-box';
+              wrapper.style.padding = '32px 36px';
+            }
+
+            const scrollContainers = clonedDoc.querySelectorAll('.overflow-x-auto');
+            scrollContainers.forEach(el => {
+              el.style.overflow = 'visible';
+            });
+
+            const morningInputs = clonedDoc.querySelectorAll('.morning-input-el');
+            morningInputs.forEach(input => {
+              const textVal = input.value || '';
+              const parent = input.parentElement;
+              if (parent) {
+                parent.innerHTML = textVal;
+                parent.style.color = '#78350f';
+                parent.style.fontWeight = '700';
+              }
+            });
+
+            const periodTh = clonedDoc.querySelector('th:first-child');
+            if (periodTh) {
+              periodTh.style.width = '110px';
+              periodTh.style.minWidth = '110px';
+            }
+
+            const periodTds = clonedDoc.querySelectorAll('#main-schedule-table tbody tr td:first-child');
+            periodTds.forEach(td => {
+              td.style.width = '110px';
+              td.style.minWidth = '110px';
+              td.style.verticalAlign = 'middle';
+              
+              const divs = td.querySelectorAll('div');
+              divs.forEach(d => {
+                d.style.lineHeight = '1.3';
+                d.style.marginTop = '0px';
+                d.style.marginBottom = '0px';
+              });
+            });
+
+            // 注入針對 Canvas 中文字型光學置中補償專屬樣式
+            const exportStyle = clonedDoc.createElement('style');
+            exportStyle.innerHTML = `
+              .schedule-badge-outer {
+                display: table !important;
+                height: 42px !important;
+                box-sizing: border-box !important;
+                margin: 0 auto !important;
+              }
+              .schedule-badge-inner {
+                display: table-cell !important;
+                vertical-align: middle !important;
+                text-align: center !important;
+                line-height: 1 !important;
+                padding-top: 0px !important;
+                padding-bottom: 13px !important;
+                padding-left: 2px !important;
+                padding-right: 2px !important;
+                box-sizing: border-box !important;
+              }
+              #main-schedule-table tbody tr:first-child .schedule-badge-outer {
+                height: 38px !important;
+              }
+              #main-schedule-table tbody tr:first-child .schedule-badge-inner {
+                padding-bottom: 11px !important;
+              }
+            `;
+            clonedDoc.head.appendChild(exportStyle);
+
+            const allTds = clonedDoc.querySelectorAll('#main-schedule-table td');
+            allTds.forEach(td => {
+              td.style.verticalAlign = 'middle';
+              const textOnly = td.textContent.trim();
+              if (textOnly === '+' || textOnly === '+ 選穿著') {
+                td.innerHTML = '';
+              }
+            });
+          }
+        }).then(canvas => {
+          const link = document.createElement('a');
+          link.download = `${AppState.scheduleTitle || '每週課表'}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          btn.innerHTML = originalText;
+          if (window.lucide) lucide.createIcons();
+        }).catch(err => {
+          console.error(err);
+          btn.innerHTML = originalText;
+          if (window.lucide) lucide.createIcons();
+        });
+      });
+
+      // Reset Subjects
+      document.getElementById('btn-reset-subjects').addEventListener('click', () => {
+        showConfirmDialog('還原預設領域', '確定要將領域清單恢復為系統預設項目嗎？', () => {
+          AppState.subjects = JSON.parse(JSON.stringify(DEFAULT_SUBJECTS));
+          renderSubjectPalette();
+        });
+      });
+
+      // Toggle Delete Subject Mode
+      const deleteModeBtn = document.getElementById('btn-toggle-delete-mode');
+      const deleteModeText = document.getElementById('delete-mode-text');
+      deleteModeBtn.addEventListener('click', () => {
+        AppState.isDeleteSubjectMode = !AppState.isDeleteSubjectMode;
+        if (AppState.isDeleteSubjectMode) {
+          deleteModeText.innerText = '完成刪除';
+          deleteModeBtn.classList.add('bg-rose-600', 'text-white');
+          deleteModeBtn.classList.remove('text-rose-600', 'bg-rose-50');
+        } else {
+          deleteModeText.innerText = '刪除領域按鈕';
+          deleteModeBtn.classList.remove('bg-rose-600', 'text-white');
+          deleteModeBtn.classList.add('text-rose-600', 'bg-rose-50');
+        }
+        renderSubjectPalette();
+      });
+
+      // Add Subject Modal
+      const modalAddSubject = document.getElementById('modal-add-subject');
+      document.getElementById('btn-open-add-subject').addEventListener('click', () => {
+        modalAddSubject.classList.remove('hidden');
+        modalAddSubject.classList.add('flex');
+        document.getElementById('new-subject-name').value = '';
+        document.getElementById('new-subject-room').value = '原班教室';
+        document.getElementById('new-subject-name').focus();
+      });
+
+      document.getElementById('btn-cancel-add-subject').addEventListener('click', () => {
+        modalAddSubject.classList.add('hidden');
+        modalAddSubject.classList.remove('flex');
+      });
+
+      document.getElementById('btn-confirm-add-subject').addEventListener('click', () => {
+        const name = document.getElementById('new-subject-name').value.trim();
+        const room = document.getElementById('new-subject-room').value.trim() || '原班教室';
+        if (!name) return;
+
+        const newId = 'sub-' + Date.now();
+        AppState.subjects.push({
+          id: newId,
+          name: name,
+          bg: selectedColorPalette.bg,
+          text: selectedColorPalette.text,
+          border: selectedColorPalette.border,
+          room: room,
+          preMsg: `請攜帶 ${name} 課本、學用品及水壺前往！`,
+          inMsg: '請保持安靜，認真聽講並主動思考'
+        });
+        renderSubjectPalette();
+        modalAddSubject.classList.add('hidden');
+        modalAddSubject.classList.remove('flex');
+      });
+
+      // Periods Modal
+      const modalPeriods = document.getElementById('modal-periods');
+      document.getElementById('btn-open-periods-modal').addEventListener('click', () => {
+        renderPeriodsEditor();
+        modalPeriods.classList.remove('hidden');
+        modalPeriods.classList.add('flex');
+      });
+      document.getElementById('btn-close-periods-modal').addEventListener('click', () => {
+        modalPeriods.classList.add('hidden');
+        modalPeriods.classList.remove('flex');
+      });
+      document.getElementById('btn-save-periods').addEventListener('click', savePeriodsFromEditor);
+      document.getElementById('btn-reset-periods-default').addEventListener('click', () => {
+        showConfirmDialog('還原預設時段', '確定恢復為預設時段時間與提醒語？', () => {
+          AppState.periods = JSON.parse(JSON.stringify(DEFAULT_PERIODS));
+          renderPeriodsEditor();
+          renderScheduleGrid();
+        });
+      });
+
+      // Classrooms Modal
+      const modalClassrooms = document.getElementById('modal-classrooms');
+      const btnOpenClassroom = document.getElementById('btn-open-classroom-modal');
+      const btnCloseClassrooms = document.getElementById('btn-close-classrooms-modal');
+      const btnSaveClassrooms = document.getElementById('btn-save-classrooms');
+
+      if (btnOpenClassroom) {
+        btnOpenClassroom.addEventListener('click', () => {
+          renderClassroomsEditor();
+          if (modalClassrooms) {
+            modalClassrooms.classList.remove('hidden');
+            modalClassrooms.classList.add('flex');
+          }
+        });
+      }
+      if (btnCloseClassrooms) {
+        btnCloseClassrooms.addEventListener('click', () => {
+          if (modalClassrooms) {
+            modalClassrooms.classList.add('hidden');
+            modalClassrooms.classList.remove('flex');
+          }
+        });
+      }
+      if (btnSaveClassrooms) {
+        btnSaveClassrooms.addEventListener('click', saveClassroomsFromEditor);
+      }
+
+      // Subject Messages Modal
+      const modalSubjectMessages = document.getElementById('modal-subject-messages');
+      const btnOpenSubjectMessages = document.getElementById('btn-open-subject-messages-modal');
+      const btnCloseSubjectMessages = document.getElementById('btn-close-subject-messages-modal');
+      const btnSaveSubjectMessages = document.getElementById('btn-save-subject-messages');
+
+      if (btnOpenSubjectMessages) {
+        btnOpenSubjectMessages.addEventListener('click', () => {
+          renderSubjectMessagesEditor();
+          if (modalSubjectMessages) {
+            modalSubjectMessages.classList.remove('hidden');
+            modalSubjectMessages.classList.add('flex');
+          }
+        });
+      }
+      if (btnCloseSubjectMessages) {
+        btnCloseSubjectMessages.addEventListener('click', () => {
+          if (modalSubjectMessages) {
+            modalSubjectMessages.classList.add('hidden');
+            modalSubjectMessages.classList.remove('flex');
+          }
+        });
+      }
+      if (btnSaveSubjectMessages) {
+        btnSaveSubjectMessages.addEventListener('click', saveSubjectMessagesFromEditor);
+      }
+
+      // Warning Messages Modal (Red theme)
+      const modalWarningMessages = document.getElementById('modal-warning-messages');
+      const btnOpenWarningMessages = document.getElementById('btn-open-warning-messages-modal');
+      const btnCloseWarningMessages = document.getElementById('btn-close-warning-messages-modal');
+      const btnSaveWarningMessages = document.getElementById('btn-save-warning-messages');
+      const btnResetWarningMessages = document.getElementById('btn-reset-warning-messages');
+      const inputWarnHome = document.getElementById('input-warning-msg-home');
+      const inputWarnOutside = document.getElementById('input-warning-msg-outside');
+
+      if (btnOpenWarningMessages) {
+        btnOpenWarningMessages.addEventListener('click', () => {
+          if (inputWarnHome) inputWarnHome.value = AppState.warningMsgHome || '請於上課鐘響前就坐，並備妥學用品，準備上課!!';
+          if (inputWarnOutside) inputWarnOutside.value = AppState.warningMsgOutside || '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!';
+          if (modalWarningMessages) {
+            modalWarningMessages.classList.remove('hidden');
+            modalWarningMessages.classList.add('flex');
+          }
+        });
+      }
+      if (btnCloseWarningMessages) {
+        btnCloseWarningMessages.addEventListener('click', () => {
+          if (modalWarningMessages) {
+            modalWarningMessages.classList.add('hidden');
+            modalWarningMessages.classList.remove('flex');
+          }
+        });
+      }
+      if (btnSaveWarningMessages) {
+        btnSaveWarningMessages.addEventListener('click', () => {
+          AppState.warningMsgHome = inputWarnHome.value.trim() || '請於上課鐘響前就坐，並備妥學用品，準備上課!!';
+          AppState.warningMsgOutside = inputWarnOutside.value.trim() || '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!';
+          if (modalWarningMessages) {
+            modalWarningMessages.classList.add('hidden');
+            modalWarningMessages.classList.remove('flex');
+          }
+          updateReminderBoard();
+        });
+      }
+      if (btnResetWarningMessages) {
+        btnResetWarningMessages.addEventListener('click', () => {
+          if (inputWarnHome) inputWarnHome.value = '請於上課鐘響前就坐，並備妥學用品，準備上課!!';
+          if (inputWarnOutside) inputWarnOutside.value = '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!';
+        });
+      }
+
+      // Clothing Modal
+      const btnSubmitClothing = document.getElementById('btn-submit-clothing-form');
+      if (btnSubmitClothing) {
+        btnSubmitClothing.onclick = () => {
+          const input = document.getElementById('input-new-clothing-name');
+          const name = input.value.trim();
+          if (!name) return;
+
+          AppState.clothingTypes.push({
+            id: 'cloth-' + Date.now(),
+            name: name,
+            bg: AppState.selectedClothingColor.bg,
+            text: AppState.selectedClothingColor.text,
+            border: AppState.selectedClothingColor.border,
+          });
+
+          input.value = '';
+          renderClothingManageList();
+          renderClothingOptions();
+          renderScheduleGrid();
+        };
+      }
+
+      const btnResetClothing = document.getElementById('btn-reset-clothing-defaults');
+      if (btnResetClothing) {
+        btnResetClothing.onclick = () => {
+          showConfirmDialog('還原預設服裝', '確定恢復為預設服裝選項（制服、運動服、校服、便服、班服）？', () => {
+            AppState.clothingTypes = JSON.parse(JSON.stringify(DEFAULT_CLOTHING_TYPES));
+            renderClothingManageList();
+            renderClothingOptions();
+            renderScheduleGrid();
+          });
+        };
+      }
+
+      const tabSelect = document.getElementById('tab-clothing-select');
+      if (tabSelect) tabSelect.onclick = () => switchClothingTab('select');
+      const tabManage = document.getElementById('tab-clothing-manage');
+      if (tabManage) tabManage.onclick = () => switchClothingTab('manage');
+      const btnCloseClothing = document.getElementById('btn-close-clothing');
+      if (btnCloseClothing) btnCloseClothing.onclick = closeClothingPicker;
+      const btnClearClothing = document.getElementById('btn-clear-clothing');
+      if (btnClearClothing) {
+        btnClearClothing.onclick = () => {
+          if (AppState.activeClothingDay) {
+            delete AppState.clothing[AppState.activeClothingDay];
+            renderScheduleGrid();
+            closeClothingPicker();
+          }
+        };
+      }
+
+      // Reminder Board Controls
+      const reminderOverlay = document.getElementById('reminder-board-overlay');
+      document.getElementById('btn-open-reminder').addEventListener('click', () => {
+        reminderOverlay.classList.remove('hidden');
+        updateReminderBoard();
+      });
+
+      document.getElementById('btn-close-reminder').addEventListener('click', () => {
+        reminderOverlay.classList.add('hidden');
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+      });
+
+      document.getElementById('btn-toggle-fullscreen').addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          reminderOverlay.requestFullscreen().catch(err => console.log(err));
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      });
+
+      const btnSound = document.getElementById('btn-toggle-sound');
+      const soundIcon = document.getElementById('sound-icon');
+      const soundText = document.getElementById('sound-text');
+      btnSound.addEventListener('click', async () => {
+        if (!toneStarted) {
+          await Tone.start();
+          toneStarted = true;
+        }
+        AppState.reminderSound = !AppState.reminderSound;
+        if (AppState.reminderSound) {
+          soundIcon.className = 'w-4 h-4 text-emerald-400';
+          soundText.innerText = '提醒音：開';
+          playSchoolBell();
+        } else {
+          soundIcon.className = 'w-4 h-4 text-slate-500';
+          soundText.innerText = '提醒音：關';
+        }
+      });
+
+      // Lead minutes select & custom input
+      const selectLead = document.getElementById('select-lead-minutes');
+      const inputCustomLead = document.getElementById('input-custom-lead-minutes');
+      selectLead.addEventListener('change', (e) => {
+        if (e.target.value === 'custom') {
+          inputCustomLead.classList.remove('hidden');
+          AppState.leadMinutes = parseFloat(inputCustomLead.value) || 5;
+        } else {
+          inputCustomLead.classList.add('hidden');
+          AppState.leadMinutes = parseFloat(e.target.value);
+        }
+        updateReminderBoard();
+      });
+
+      inputCustomLead.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val > 0) {
+          AppState.leadMinutes = val;
+          updateReminderBoard();
+        }
+      });
+
+      // Warning minutes select & custom input
+      const selectWarning = document.getElementById('select-warning-minutes');
+      const inputCustomWarning = document.getElementById('input-custom-warning-minutes');
+      if (selectWarning && inputCustomWarning) {
+        selectWarning.addEventListener('change', (e) => {
+          if (e.target.value === 'custom') {
+            inputCustomWarning.classList.remove('hidden');
+            AppState.warningMinutes = parseFloat(inputCustomWarning.value) || 1;
+          } else {
+            inputCustomWarning.classList.add('hidden');
+            AppState.warningMinutes = parseFloat(e.target.value);
+          }
+          updateReminderBoard();
+        });
+
+        inputCustomWarning.addEventListener('input', (e) => {
+          const val = parseFloat(e.target.value);
+          if (!isNaN(val) && val > 0) {
+            AppState.warningMinutes = val;
+            updateReminderBoard();
+          }
+        });
+      }
+
+      const simBar = document.getElementById('sim-controls-bar');
+      document.getElementById('btn-toggle-sim-bar').addEventListener('click', () => {
+        simBar.classList.toggle('hidden');
+      });
+
+      document.getElementById('btn-sim-reallife').addEventListener('click', () => {
+        AppState.simulatedMode = false;
+        AppState.simulatedDate = null;
+        updateReminderBoard();
+      });
+
+      document.getElementById('btn-sim-break').addEventListener('click', () => {
+        AppState.simulatedMode = true;
+        const d = new Date();
+        d.setHours(9, 16, 0); // 09:16 (4 mins before 09:20 period 2)
+        AppState.simulatedDate = d;
+        document.getElementById('sim-select-weekday').value = "1";
+        document.getElementById('sim-custom-time').value = "09:16";
+        updateReminderBoard();
+      });
+
+      const btnSimWarning = document.getElementById('btn-sim-warning');
+      if (btnSimWarning) {
+        btnSimWarning.addEventListener('click', () => {
+          AppState.simulatedMode = true;
+          const d = new Date();
+          d.setHours(9, 19, 15); // 09:19:15 (45s before 09:20 period 2)
+          AppState.simulatedDate = d;
+          document.getElementById('sim-select-weekday').value = "1";
+          document.getElementById('sim-custom-time').value = "09:19";
+          updateReminderBoard();
+        });
+      }
+
+      document.getElementById('btn-sim-class').addEventListener('click', () => {
+        AppState.simulatedMode = true;
+        const d = new Date();
+        d.setHours(9, 30, 0);
+        AppState.simulatedDate = d;
+        document.getElementById('sim-select-weekday').value = "1";
+        document.getElementById('sim-custom-time').value = "09:30";
+        updateReminderBoard();
+      });
+
+      document.getElementById('sim-custom-time').addEventListener('input', (e) => {
+        const timeVal = e.target.value;
+        if (!timeVal) return;
+        AppState.simulatedMode = true;
+        const [h, m] = timeVal.split(':').map(Number);
+        const d = AppState.simulatedDate ? new Date(AppState.simulatedDate) : new Date();
+        d.setHours(h, m, 0);
+        AppState.simulatedDate = d;
+        updateReminderBoard();
+      });
+
+      document.getElementById('sim-select-weekday').addEventListener('change', (e) => {
+        AppState.simulatedMode = true;
+        const weekday = parseInt(e.target.value, 10);
+        const d = AppState.simulatedDate ? new Date(AppState.simulatedDate) : new Date();
+        const currentDay = d.getDay();
+        const diff = weekday - currentDay;
+        d.setDate(d.getDate() + diff);
+        AppState.simulatedDate = d;
+        updateReminderBoard();
+      });
+
+      setInterval(() => {
+        if (!reminderOverlay.classList.contains('hidden')) {
+          if (AppState.simulatedMode && AppState.simulatedDate) {
+            AppState.simulatedDate.setSeconds(AppState.simulatedDate.getSeconds() + 1);
+          }
+          updateReminderBoard();
+        }
+      }, 1000);
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
+  </script>
+</body>
+</html>
