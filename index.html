@@ -608,7 +608,7 @@
     </div>
 
     <!-- Simulation Bar -->
-    <div id="sim-controls-bar" class="bg-indigo-950/80 border-b border-indigo-800/60 px-6 py-2.5 flex flex-wrap items-center justify-between text-xs text-indigo-200">
+    <div id="sim-controls-bar" class="hidden bg-indigo-950/80 border-b border-indigo-800/60 px-6 py-2.5 flex flex-wrap items-center justify-between text-xs text-indigo-200">
       <div class="flex items-center space-x-3 mb-1 sm:mb-0">
         <span class="font-bold text-amber-300 flex items-center space-x-1">
           <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i>
@@ -827,15 +827,8 @@
       warningMinutes: 1, // 預設 1 分鐘警示時間
       warningMsgHome: '請於上課鐘響前就坐，並備妥學用品，準備上課!!',
       warningMsgOutside: '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!',
-      simulatedMode: true,
-      simulatedDate: (() => {
-        const d = new Date();
-        const curDay = d.getDay();
-        const diff = 1 - (curDay === 0 ? 7 : curDay);
-        d.setDate(d.getDate() + diff);
-        d.setHours(9, 16, 0, 0);
-        return d;
-      })(),
+      simulatedMode: false, // 預設使用真實時間
+      simulatedDate: null,
       lastChimeTimestamp: null,
     };
 
@@ -2266,17 +2259,11 @@
       const reminderOverlay = document.getElementById('reminder-board-overlay');
       document.getElementById('btn-open-reminder').addEventListener('click', () => {
         reminderOverlay.classList.remove('hidden');
-        if (!AppState.simulatedMode) {
-          AppState.simulatedMode = true;
-          const d = new Date();
-          const curDay = d.getDay();
-          const diff = 1 - (curDay === 0 ? 7 : curDay);
-          d.setDate(d.getDate() + diff);
-          d.setHours(9, 16, 0, 0);
-          AppState.simulatedDate = d;
-          if (simBar) simBar.classList.remove('hidden');
-          updateSimButtonState(true);
-        }
+        // 預設進入為真實時間，不開啟模擬測試
+        AppState.simulatedMode = false;
+        AppState.simulatedDate = null;
+        if (simBar) simBar.classList.add('hidden');
+        updateSimButtonState(false);
         updateReminderBoard();
       });
 
@@ -2423,30 +2410,42 @@
       const simBtnText = document.getElementById('sim-btn-text');
 
       function updateSimButtonState(isOpen) {
-        if (!btnSimToggle) return;
+        if (!simBtnIcon || !btnSimToggle || !simBtnText) return;
         if (isOpen) {
-          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 border bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-500/20 ring-1 ring-indigo-400 cursor-pointer whitespace-nowrap';
-          if (simBtnIcon) simBtnIcon.className = 'w-3.5 h-3.5 text-amber-300';
-          if (simBtnText) simBtnText.innerText = '模擬測試';
+          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 border border-indigo-400 text-white rounded-lg transition-all cursor-pointer shadow-md shadow-indigo-900/40';
+          simBtnIcon.className = 'w-3.5 h-3.5 text-amber-300';
+          simBtnText.innerText = '模擬測試中';
         } else {
-          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 border bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 shadow-sm cursor-pointer whitespace-nowrap';
-          if (simBtnIcon) simBtnIcon.className = 'w-3.5 h-3.5 text-slate-400';
-          if (simBtnText) simBtnText.innerText = '模擬測試';
+          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer';
+          simBtnIcon.className = 'w-3.5 h-3.5 text-slate-400';
+          simBtnText.innerText = '模擬測試';
         }
       }
 
-      // Initial state: 預設開啟模擬模式
+      // Initial state: 預設為真實時間，模擬按鈕與橫幅維持關閉
       const simSelectWeekday = document.getElementById('sim-select-weekday');
       const simCustomTime = document.getElementById('sim-custom-time');
       if (simSelectWeekday) simSelectWeekday.value = "1";
       if (simCustomTime) simCustomTime.value = "09:16";
-      updateSimButtonState(true);
+      updateSimButtonState(false);
 
       if (btnSimToggle && simBar) {
         btnSimToggle.addEventListener('click', () => {
           simBar.classList.toggle('hidden');
           const isNowOpen = !simBar.classList.contains('hidden');
           updateSimButtonState(isNowOpen);
+          if (isNowOpen) {
+            AppState.simulatedMode = true;
+            if (!AppState.simulatedDate) {
+              const d = new Date();
+              d.setHours(9, 16, 0, 0);
+              AppState.simulatedDate = d;
+            }
+          } else {
+            AppState.simulatedMode = false;
+            AppState.simulatedDate = null;
+          }
+          updateReminderBoard();
         });
       }
 
