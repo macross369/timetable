@@ -748,12 +748,22 @@
       },
       { 
         id: 'p-lunch', 
-        name: '午餐午休', 
+        name: '午餐時間', 
         startTime: '11:50', 
-        endTime: '13:20', 
+        endTime: '12:20', 
         icon: 'utensils', 
         type: 'break',
-        inClassMsg: '用餐細嚼慢嚥，午休保持教室安靜',
+        inClassMsg: '用餐細嚼慢嚥，落實餐後潔牙與整理',
+        breakMsg: '午餐結束請潔牙洗手，準備午休'
+      },
+      { 
+        id: 'p-nap', 
+        name: '午休時間', 
+        startTime: '12:30', 
+        endTime: '13:20', 
+        icon: 'moon', 
+        type: 'break',
+        inClassMsg: '午休請保持安靜，放鬆身心休養生息',
         breakMsg: '午休結束請洗洗臉、喝口水，準備下午課程'
       },
       { 
@@ -990,6 +1000,8 @@
           iconHtml = '<i data-lucide="sun" class="w-3.5 h-3.5 text-amber-500 inline mr-1"></i>';
         } else if (period.icon === 'utensils') {
           iconHtml = '<i data-lucide="utensils" class="w-3.5 h-3.5 text-emerald-600 inline mr-1"></i>';
+        } else if (period.icon === 'moon') {
+          iconHtml = '<i data-lucide="moon" class="w-3.5 h-3.5 text-indigo-400 inline mr-1"></i>';
         }
 
         periodHeaderTd.innerHTML = `
@@ -1007,10 +1019,10 @@
           cellTd.className = 'py-2 px-1.5 sm:px-2 border-r border-slate-100 last:border-r-0 h-16 align-middle relative transition-colors cursor-pointer';
           cellTd.dataset.cellKey = cellKey;
 
-          // Special: Lunch & Nap Period (午餐午休時段留白)
-          if (period.id === 'p-lunch' || period.type === 'break') {
+          // Special: Lunch & Nap Periods (午餐時間與午休時間皆留白，不開放填寫課程)
+          if (period.id === 'p-lunch' || period.id === 'p-nap' || period.type === 'break') {
             const blankTd = document.createElement('td');
-            blankTd.className = 'py-2 px-1.5 sm:px-2 border-r border-slate-100 last:border-r-0 h-14 bg-slate-50/40 select-none';
+            blankTd.className = 'py-2 px-1.5 sm:px-2 border-r border-slate-100 last:border-r-0 h-12 bg-slate-50/40 select-none';
             tr.appendChild(blankTd);
             continue;
           }
@@ -1589,49 +1601,56 @@
               <i data-lucide="check-circle" class="w-8 h-8"></i>
             </div>
             <h3 class="text-2xl font-bold text-slate-100 mb-2">今日課程已圓滿結束！</h3>
-            <p class="text-slate-400 text-sm">請整理書包與座位，注意回家路途安全。</p>
+            <p class="text-slate-400 text-sm">請檢查聯絡簿與作業是否都已收妥，安心放學返家，期待明天再見！</p>
           </div>
         `;
         if (window.lucide) lucide.createIcons();
         return;
       }
 
-      // SCENARIO 1: Lunch Break
-      if (currentPeriod && (currentPeriod.type === 'break' || currentPeriod.id === 'p-lunch')) {
+      // SCENARIO 1: Lunch or Nap Break
+      if (currentPeriod && (currentPeriod.type === 'break' || currentPeriod.id === 'p-lunch' || currentPeriod.id === 'p-nap')) {
         const leadSecLimit = AppState.leadMinutes * 60;
         const pEndSec = parseTimeToSeconds(currentPeriod.endTime);
-        const secsUntilAfternoonClass = pEndSec - currentTimeInSecs;
+        const secsUntilNext = pEndSec - currentTimeInSecs;
 
-        if (secsUntilAfternoonClass > leadSecLimit || !nextPeriod) {
+        if (secsUntilNext > leadSecLimit || !nextPeriod) {
           const startSec = parseTimeToSeconds(currentPeriod.startTime);
           const totalDuration = pEndSec - startSec;
           const elapsed = currentTimeInSecs - startSec;
           const progressPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
-          const remainMins = Math.ceil(secsUntilAfternoonClass / 60);
+          const remainMins = Math.ceil(secsUntilNext / 60);
+
+          const isLunch = currentPeriod.id === 'p-lunch';
+          const badgeIcon = isLunch ? 'utensils' : 'moon';
+          const badgeColor = isLunch ? 'emerald' : 'indigo';
+          const mainTitle = isLunch ? '用餐與餐後潔牙' : '安靜午休養精蓄銳';
+          const defaultMsg = isLunch ? '用餐細嚼慢嚥，落實餐後潔牙與整理' : '午休請保持安靜，放鬆身心休養生息';
+          const remainLabel = isLunch ? '距離潔牙/午休還有：' : '距離下午上課還有：';
 
           container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
           container.innerHTML = `
             <div class="flex flex-col items-center">
-              <div class="inline-flex items-center space-x-2.5 px-5 py-2 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-sm font-bold mb-4 shadow-sm">
-                <i data-lucide="utensils" class="w-4 h-4 text-emerald-400"></i>
-                <span>午餐午休時間</span>
+              <div class="inline-flex items-center space-x-2.5 px-5 py-2 rounded-full bg-${badgeColor}-950/80 border border-${badgeColor}-500/40 text-${badgeColor}-300 text-sm font-bold mb-4 shadow-sm">
+                <i data-lucide="${badgeIcon}" class="w-4 h-4 text-${badgeColor}-400"></i>
+                <span>${currentPeriod.name}</span>
               </div>
 
               <div class="text-slate-400 text-sm mb-1">${currentPeriod.name} (${currentPeriod.startTime} - ${currentPeriod.endTime})</div>
-              <h3 class="text-4xl sm:text-5xl font-black text-white tracking-wide mb-4">用餐與安靜休養</h3>
+              <h3 class="text-4xl sm:text-5xl font-black text-white tracking-wide mb-4">${mainTitle}</h3>
 
               <div class="flex items-center justify-center space-x-3 text-slate-100 text-base sm:text-xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-6 shadow-md">
                 <i data-lucide="sparkles" class="w-5 h-5 text-amber-400 shrink-0"></i>
-                <span class="text-slate-200 font-semibold">${currentPeriod.inClassMsg || '用餐細嚼慢嚥，午休保持教室安靜'}</span>
+                <span class="text-slate-200 font-semibold">${currentPeriod.inClassMsg || defaultMsg}</span>
               </div>
 
               <div class="w-full max-w-md bg-slate-800/60 p-4 rounded-2xl border border-slate-800">
                 <div class="flex justify-between text-xs text-slate-400 mb-2">
-                  <span>距離下午上課還有：<strong class="text-amber-300 font-bold font-mono text-sm">${remainMins} 分鐘</strong></span>
+                  <span>${remainLabel}<strong class="text-amber-300 font-bold font-mono text-sm">${remainMins} 分鐘</strong></span>
                   <span>進度 ${progressPercent}%</span>
                 </div>
                 <div class="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden">
-                  <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
+                  <div class="bg-gradient-to-r from-${badgeColor}-500 to-teal-400 h-full rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
                 </div>
               </div>
             </div>
@@ -1688,9 +1707,10 @@
 
       // SCENARIO 3: Recess, Pre-class Notice, or Red Alert
       if (nextPeriod) {
+        const isNextNap = nextPeriod.id === 'p-nap';
         const cellKey = `${nextPeriod.id}-${currentDay}`;
-        const nextSubjectName = AppState.grid[cellKey] || '自習 / 彈性';
-        const matchedSubject = AppState.subjects.find(s => s.name === nextSubjectName);
+        const nextSubjectName = isNextNap ? (nextPeriod.name || '午休時間') : (AppState.grid[cellKey] || '自習 / 彈性');
+        const matchedSubject = isNextNap ? null : AppState.subjects.find(s => s.name === nextSubjectName);
         const classroom = matchedSubject ? matchedSubject.room : '原班教室';
 
         const leadSecLimit = AppState.leadMinutes * 60;
@@ -1698,8 +1718,10 @@
         const isWithinLeadTime = secondsToNext <= leadSecLimit;
         const isWithinWarningTime = secondsToNext <= warningSecLimit;
         
-        const breakText = nextPeriod.breakMsg || '下課請喝水、上廁所，讓眼睛好好休息一下';
-        const preClassSubjectMsg = (matchedSubject && matchedSubject.preMsg) || `請攜帶 ${nextSubjectName} 課本、學用品及水壺前往！`;
+        const breakText = isNextNap ? '午餐結束請確實完成潔牙與如廁，收拾好桌面準備午休' : (nextPeriod.breakMsg || '下課請喝水、上廁所，讓眼睛好好休息一下');
+        const preClassSubjectMsg = isNextNap 
+          ? '請完成餐後潔牙、如廁，收妥桌面物品，準備趴下安靜午休！'
+          : ((matchedSubject && matchedSubject.preMsg) || `請攜帶 ${nextSubjectName} 課本、學用品及水壺前往！`);
 
         const minsLeft = Math.floor(secondsToNext / 60);
         const secsLeft = secondsToNext % 60;
@@ -1715,20 +1737,27 @@
           container.className = 'w-full max-w-2xl bg-rose-950/90 border-2 border-rose-500 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500 shadow-rose-950/50';
           
           const isHomeClassroom = classroom.includes('原班教室') || classroom === '原班';
-          const warningDetailMsg = isHomeClassroom
-            ? (AppState.warningMsgHome || '請於上課鐘響前就坐，並備妥學用品，準備上課!!')
-            : (AppState.warningMsgOutside || '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!');
+          const warningDetailMsg = isNextNap 
+            ? '午休鐘聲即將響起，請立刻回到座位就坐，趴下閉眼安靜休息！'
+            : (isHomeClassroom
+                ? (AppState.warningMsgHome || '請於上課鐘響前就坐，並備妥學用品，準備上課!!')
+                : (AppState.warningMsgOutside || '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!'));
 
-          container.innerHTML = `
-            <div class="flex flex-col items-center animate-soft-pulse">
-              <div class="inline-flex items-center space-x-2 px-5 py-2 rounded-full bg-rose-600 border border-rose-400 text-white text-sm sm:text-base font-black mb-4 shadow-lg">
-                <i data-lucide="alert-octagon" class="w-5 h-5 text-amber-300"></i>
-                <span>即將上課警示 (倒數 ${countdownStr})</span>
+          let contentHtml = '';
+          if (isNextNap) {
+            // 午休專屬警示：無地點欄位
+            contentHtml = `
+              <div class="w-full max-w-lg bg-rose-900/50 border-2 border-rose-400/80 p-5 rounded-2xl text-center mb-5 shadow-md">
+                <div class="flex items-center justify-center space-x-2 text-rose-200 text-sm font-bold mb-1">
+                  <i data-lucide="moon" class="w-5 h-5 text-amber-300"></i>
+                  <span>午休準備叮嚀</span>
+                </div>
+                <p class="text-sm sm:text-base text-white font-extrabold mt-1">請停止交談與走動，桌面清空，準備趴下休息</p>
               </div>
-
-              <div class="text-rose-200 text-sm mb-1">下一節：${nextPeriod.name} (${nextPeriod.startTime} 準時上課)</div>
-              <h3 class="text-4xl sm:text-5xl font-black text-rose-200 tracking-wide mb-3">${nextSubjectName}</h3>
-
+            `;
+          } else {
+            // 一般課程警示：含地點與學用品叮嚀
+            contentHtml = `
               <div class="w-full max-w-lg bg-rose-900/50 border-2 border-rose-400/80 p-5 rounded-2xl text-left mb-5 shadow-md">
                 <div class="flex items-center space-x-3.5">
                   <div class="p-2.5 bg-rose-500 text-white rounded-xl shrink-0">
@@ -1743,8 +1772,22 @@
                   </div>
                 </div>
               </div>
+            `;
+          }
 
-              <div class="text-xs sm:text-sm font-bold text-white bg-rose-700/80 px-5 py-2.5 rounded-xl border border-rose-400/60 flex items-center space-x-2 shadow-sm text-center">
+          container.innerHTML = `
+            <div class="flex flex-col items-center animate-soft-pulse">
+              <div class="inline-flex items-center space-x-2 px-5 py-2 rounded-full bg-rose-600 border border-rose-400 text-white text-sm sm:text-base font-black mb-4 shadow-lg">
+                <i data-lucide="alert-octagon" class="w-5 h-5 text-amber-300"></i>
+                <span>${isNextNap ? '即將午休警示' : '即將上課警示'} (倒數 ${countdownStr})</span>
+              </div>
+
+              <div class="text-rose-200 text-sm mb-1">下一階段：${nextPeriod.name} (${nextPeriod.startTime} 開始)</div>
+              <h3 class="text-4xl sm:text-5xl font-black text-rose-200 tracking-wide mb-3">${nextSubjectName}</h3>
+
+              ${contentHtml}
+
+              <div class="text-xs sm:text-sm font-bold text-white bg-rose-700/80 px-5 py-2.5 rounded-xl border border-rose-400/60 flex items-center justify-center space-x-2 shadow-sm text-center">
                 <i data-lucide="bell-ring" class="w-4 h-4 text-amber-300 shrink-0"></i>
                 <span>${warningDetailMsg}</span>
               </div>
@@ -1754,16 +1797,22 @@
         // YELLOW PRE-CLASS NOTICE MODE
         else if (isWithinLeadTime) {
           container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
-          container.innerHTML = `
-            <div class="flex flex-col items-center animate-soft-pulse">
-              <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-300 text-sm font-bold mb-4">
-                <i data-lucide="alert-circle" class="w-4 h-4"></i>
-                <span>即將上課叮嚀 (倒數 ${countdownStr})</span>
+          
+          let contentHtml = '';
+          if (isNextNap) {
+            // 午休專屬首次提醒：無地點欄位
+            contentHtml = `
+              <div class="w-full max-w-lg bg-amber-500/10 border-2 border-amber-500/40 p-5 rounded-2xl text-center mb-5">
+                <div class="flex items-center justify-center space-x-2 text-amber-200 text-sm font-bold mb-1">
+                  <i data-lucide="moon" class="w-5 h-5 text-amber-400"></i>
+                  <span>午休準備提示</span>
+                </div>
+                <p class="text-sm sm:text-base text-amber-100 font-bold mt-1">請完成餐後潔牙與如廁，收妥桌面物品，準備趴下安靜午休！</p>
               </div>
-
-              <div class="text-slate-400 text-sm mb-1">下一節：${nextPeriod.name} (${nextPeriod.startTime} 準時上課)</div>
-              <h3 class="text-4xl sm:text-5xl font-black text-amber-300 tracking-wide mb-3">${nextSubjectName}</h3>
-
+            `;
+          } else {
+            // 一般課程首次提醒：含地點欄位
+            contentHtml = `
               <div class="w-full max-w-lg bg-amber-500/10 border-2 border-amber-500/40 p-5 rounded-2xl text-left mb-5">
                 <div class="flex items-center space-x-3.5">
                   <div class="p-2.5 bg-amber-500 text-slate-950 rounded-xl shrink-0">
@@ -1778,10 +1827,24 @@
                   </div>
                 </div>
               </div>
+            `;
+          }
 
-              <div class="text-xs sm:text-sm font-semibold text-amber-200 bg-amber-950/40 px-4 py-2 rounded-xl border border-amber-800/40 flex items-center space-x-1.5">
+          container.innerHTML = `
+            <div class="flex flex-col items-center animate-soft-pulse">
+              <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-300 text-sm font-bold mb-4">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                <span>${isNextNap ? '即將午休叮嚀' : '即將上課叮嚀'} (倒數 ${countdownStr})</span>
+              </div>
+
+              <div class="text-slate-400 text-sm mb-1">下一階段：${nextPeriod.name} (${nextPeriod.startTime} 開始)</div>
+              <h3 class="text-4xl sm:text-5xl font-black text-amber-300 tracking-wide mb-3">${nextSubjectName}</h3>
+
+              ${contentHtml}
+
+              <div class="text-xs sm:text-sm font-semibold text-amber-200 bg-amber-950/40 px-4 py-2 rounded-xl border border-amber-800/40 flex items-center justify-center space-x-1.5">
                 <i data-lucide="bell" class="w-4 h-4 text-amber-400"></i>
-                <span>上課鐘響時請趕快就座，準備上課</span>
+                <span>${isNextNap ? '午休鐘響請立即保持安靜並趴下休息' : '上課鐘響時請趕快就座，準備上課'}</span>
               </div>
             </div>
           `;
@@ -1789,20 +1852,37 @@
         // REGULAR BREAK TIME MODE
         else {
           container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
-          container.innerHTML = `
-            <div class="flex flex-col items-center">
-              <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-sky-500/20 border border-sky-500/40 text-sky-300 text-sm font-bold mb-4">
-                <i data-lucide="coffee" class="w-4 h-4"></i>
-                <span>下課休息時間 (距離下節還有 ${Math.ceil(secondsToNext / 60)} 分鐘)</span>
+          
+          let middleInfoHtml = '';
+          if (isNextNap) {
+            // 午休前普通休息：無地點欄位
+            middleInfoHtml = `
+              <div class="flex items-center justify-center space-x-3 text-slate-100 text-base sm:text-xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-5 shadow-md">
+                <i data-lucide="moon" class="w-5 h-5 text-indigo-400 shrink-0"></i>
+                <span>餐後請確實潔牙、漱口並上廁所，稍後準備進入午休</span>
               </div>
-
-              <div class="text-slate-400 text-xs sm:text-sm mb-1">下一節課為 ${nextPeriod.name} (${nextPeriod.startTime})</div>
-              <h3 class="text-3xl sm:text-4xl font-extrabold text-white tracking-wide mb-3">${nextSubjectName}</h3>
-
+            `;
+          } else {
+            // 一般課程普通休息：含地點欄位
+            middleInfoHtml = `
               <div class="flex items-center justify-center space-x-3 text-slate-100 text-lg sm:text-2xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-5 shadow-md">
                 <i data-lucide="map-pin" class="w-6 h-6 text-indigo-400 shrink-0"></i>
                 <span>上課地點：<strong class="text-white font-extrabold">${classroom}</strong></span>
               </div>
+            `;
+          }
+
+          container.innerHTML = `
+            <div class="flex flex-col items-center">
+              <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-sky-500/20 border border-sky-500/40 text-sky-300 text-sm font-bold mb-4">
+                <i data-lucide="${isNextNap ? 'utensils' : 'coffee'}" class="w-4 h-4"></i>
+                <span>${isNextNap ? '餐後潔牙與休息時間' : '下課休息時間'} (距離下節還有 ${Math.ceil(secondsToNext / 60)} 分鐘)</span>
+              </div>
+
+              <div class="text-slate-400 text-xs sm:text-sm mb-1">下一階段為 ${nextPeriod.name} (${nextPeriod.startTime})</div>
+              <h3 class="text-3xl sm:text-4xl font-extrabold text-white tracking-wide mb-3">${nextSubjectName}</h3>
+
+              ${middleInfoHtml}
 
               <p class="text-slate-300 text-xs sm:text-sm bg-slate-800/60 px-4 py-2 rounded-xl border border-slate-700/40 flex items-center space-x-1.5">
                 <i data-lucide="sparkles" class="w-4 h-4 text-sky-400"></i>
