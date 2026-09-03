@@ -125,9 +125,20 @@
     .minimal-mode #minimal-floating-bar {
       display: flex !important;
     }
+
+    /* Auto-save toast notification */
+    #autosave-toast {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Auto-save notification badge -->
+  <div id="autosave-toast" class="fixed bottom-5 right-5 z-50 bg-slate-900/90 text-emerald-400 text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-700/80 shadow-lg flex items-center space-x-1.5 opacity-0 pointer-events-none transform translate-y-2">
+    <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+    <span>已自動儲存於本機</span>
+  </div>
 
   <header class="no-print bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -144,34 +155,34 @@
 
       <!-- Action Buttons -->
       <div class="flex items-center space-x-2 sm:space-x-3">
-        <button id="btn-open-reminder" class="flex items-center space-x-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm rounded-xl shadow-sm transition-all transform active:scale-95">
+        <button id="btn-open-reminder" class="flex items-center space-x-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm rounded-xl shadow-sm transition-all transform active:scale-95 cursor-pointer">
           <i data-lucide="bell-ring" class="w-4 h-4"></i>
           <span class="hidden sm:inline">課堂智慧提醒看板</span>
           <span class="sm:hidden">提醒看板</span>
         </button>
 
-        <button id="btn-export-json" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors">
+        <button id="btn-export-json" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer" title="將課表設定檔備份成 JSON 檔">
           <i data-lucide="file-down" class="w-4 h-4 text-slate-500"></i>
           <span class="hidden lg:inline">匯出課表</span>
         </button>
 
-        <button id="btn-trigger-import" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors">
+        <button id="btn-trigger-import" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer" title="從 JSON 檔還原課表">
           <i data-lucide="file-up" class="w-4 h-4 text-slate-500"></i>
           <span class="hidden lg:inline">匯入課表</span>
         </button>
         <input type="file" id="input-import-json" accept=".json" class="hidden">
 
-        <button id="btn-clear-grid" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors">
+        <button id="btn-clear-grid" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer">
           <i data-lucide="rotate-ccw" class="w-4 h-4 text-slate-500"></i>
           <span class="hidden md:inline">清空課表</span>
         </button>
 
-        <button onclick="window.print()" class="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm rounded-xl shadow-sm transition-all">
+        <button onclick="window.print()" class="flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm rounded-xl shadow-sm transition-all cursor-pointer">
           <i data-lucide="printer" class="w-4 h-4"></i>
           <span>列印 / 存為 PDF</span>
         </button>
 
-        <button id="btn-export-png" class="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-all">
+        <button id="btn-export-png" class="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl shadow-sm transition-all cursor-pointer">
           <i data-lucide="download" class="w-4 h-4"></i>
           <span>下載圖片 (PNG)</span>
         </button>
@@ -188,12 +199,13 @@
         <!-- Tips Banner -->
         <div class="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4.5 text-xs text-indigo-900 leading-relaxed shadow-sm">
           <div class="flex items-start space-x-2.5">
-            <div class="p-1 bg-indigo-200/60 text-indigo-700 rounded-lg mt-0.5">
+            <div class="p-1 bg-indigo-200/60 text-indigo-700 rounded-lg mt-0.5 shrink-0">
               <i data-lucide="info" class="w-4 h-4"></i>
             </div>
             <div>
               <h4 class="font-bold text-sm text-indigo-950 mb-1.5">操作說明：</h4>
               <ol class="space-y-1 text-indigo-800 list-decimal list-inside">
+                <li><strong class="font-semibold text-indigo-950">自動存檔</strong>：所有排課與設定皆即時儲存於本機瀏覽器。</li>
                 <li><strong class="font-semibold text-indigo-950">點選置入</strong>：先點選下方領域，再點擊課表格子放入。</li>
                 <li><strong class="font-semibold text-indigo-950">拖曳置入</strong>：按住領域卡片直接拖曳至格子內。</li>
                 <li><strong class="font-semibold text-indigo-950">點擊清除</strong>：點選已安排的格子可將該節清空。</li>
@@ -246,7 +258,7 @@
           <!-- Classroom Locations Link -->
           <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
             <span class="text-slate-400">各領域上課教室地點：</span>
-            <button id="btn-open-classroom-modal" class="text-indigo-600 font-semibold hover:underline flex items-center space-x-1">
+            <button id="btn-open-classroom-modal" class="text-indigo-600 font-semibold hover:underline flex items-center space-x-1 cursor-pointer">
               <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
               <span>設定科任教室</span>
             </button>
@@ -263,19 +275,19 @@
           </div>
 
           <!-- Open Periods Editor -->
-          <button id="btn-open-periods-modal" class="w-full py-2 px-3 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 font-medium text-xs rounded-xl border border-indigo-200/80 flex items-center justify-center space-x-1.5 transition-colors">
+          <button id="btn-open-periods-modal" class="w-full py-2 px-3 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 font-medium text-xs rounded-xl border border-indigo-200/80 flex items-center justify-center space-x-1.5 transition-colors cursor-pointer">
             <i data-lucide="clock" class="w-4 h-4"></i>
             <span>編輯各節時段、時間與提醒語</span>
           </button>
 
           <!-- Open Subject Message Config -->
-          <button id="btn-open-subject-messages-modal" class="w-full py-2 px-3 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 font-medium text-xs rounded-xl border border-emerald-200/80 flex items-center justify-center space-x-1.5 transition-colors">
+          <button id="btn-open-subject-messages-modal" class="w-full py-2 px-3 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 font-medium text-xs rounded-xl border border-emerald-200/80 flex items-center justify-center space-x-1.5 transition-colors cursor-pointer">
             <i data-lucide="message-square" class="w-4 h-4"></i>
             <span>設定領域課程訊息 (上課前與上課中提示)</span>
           </button>
 
           <!-- Open Warning Message Config (Red) -->
-          <button id="btn-open-warning-messages-modal" class="w-full py-2 px-3 bg-rose-50/70 hover:bg-rose-100 text-rose-700 font-medium text-xs rounded-xl border border-rose-200/80 flex items-center justify-center space-x-1.5 transition-colors">
+          <button id="btn-open-warning-messages-modal" class="w-full py-2 px-3 bg-rose-50/70 hover:bg-rose-100 text-rose-700 font-medium text-xs rounded-xl border border-rose-200/80 flex items-center justify-center space-x-1.5 transition-colors cursor-pointer">
             <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600"></i>
             <span>設定警示時間訊息 (原班教室與科任教室警示提示)</span>
           </button>
@@ -351,8 +363,8 @@
         </div>
       </div>
       <div class="mt-5 flex justify-end space-x-2">
-        <button id="btn-cancel-add-subject" class="px-3.5 py-1.5 text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">取消</button>
-        <button id="btn-confirm-add-subject" class="px-3.5 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium">新增領域</button>
+        <button id="btn-cancel-add-subject" class="px-3.5 py-1.5 text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer">取消</button>
+        <button id="btn-confirm-add-subject" class="px-3.5 py-1.5 text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium cursor-pointer">新增領域</button>
       </div>
     </div>
   </div>
@@ -365,15 +377,15 @@
           <i data-lucide="clock" class="w-5 h-5 text-indigo-600"></i>
           <span>編輯時段名稱、起訖時間與提醒語</span>
         </h3>
-        <button id="btn-close-periods-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button id="btn-close-periods-modal" class="text-slate-400 hover:text-slate-600 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
       <p class="text-xs text-slate-500 mt-2 mb-3">請設定每一節課的起訖時間與專屬提醒詞，看板將於課前及課中即時切換顯示。</p>
       
       <div id="periods-editor-list" class="space-y-3 overflow-y-auto pr-1 flex-1"></div>
 
       <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end space-x-2">
-        <button id="btn-reset-periods-default" class="mr-auto text-xs text-rose-600 hover:underline">還原預設時段與時間</button>
-        <button id="btn-save-periods" class="px-4 py-2 text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl font-medium">儲存時段設定</button>
+        <button id="btn-reset-periods-default" class="mr-auto text-xs text-rose-600 hover:underline cursor-pointer">還原預設時段與時間</button>
+        <button id="btn-save-periods" class="px-4 py-2 text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl font-medium cursor-pointer">儲存時段設定</button>
       </div>
     </div>
   </div>
@@ -386,19 +398,19 @@
           <i data-lucide="map-pin" class="w-5 h-5 text-indigo-600"></i>
           <span>設定各領域上課教室地點</span>
         </h3>
-        <button id="btn-close-classrooms-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button id="btn-close-classrooms-modal" class="text-slate-400 hover:text-slate-600 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
       <p class="text-xs text-slate-500 mt-2 mb-3">設定科任教室地點後，將會在提醒看板上課前自動提示學生前往。</p>
       
       <div id="classrooms-editor-list" class="space-y-2 overflow-y-auto pr-1 flex-1 max-h-60"></div>
 
       <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end space-x-2">
-        <button id="btn-save-classrooms" class="px-4 py-2 text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl font-medium">儲存地點設定</button>
+        <button id="btn-save-classrooms" class="px-4 py-2 text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl font-medium cursor-pointer">儲存地點設定</button>
       </div>
     </div>
   </div>
 
-  <!-- 4. Subject Messages Config Modal (上課前與上課中提示) -->
+  <!-- 4. Subject Messages Config Modal -->
   <div id="modal-subject-messages" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-xl max-h-[90vh] flex flex-col">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -406,19 +418,19 @@
           <i data-lucide="message-square" class="w-5 h-5 text-emerald-600"></i>
           <span>設定領域課程訊息 (上課前與上課中提示)</span>
         </h3>
-        <button id="btn-close-subject-messages-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button id="btn-close-subject-messages-modal" class="text-slate-400 hover:text-slate-600 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
       <p class="text-xs text-slate-500 mt-2 mb-3">針對各個學科領域自訂課前準備用具提醒與上課時的專注提示，將於看板對應時段即時呈現。</p>
       
       <div id="subject-messages-editor-list" class="space-y-3 overflow-y-auto pr-1 flex-1"></div>
 
       <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end space-x-2">
-        <button id="btn-save-subject-messages" class="px-4 py-2 text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl font-medium">儲存領域提示語</button>
+        <button id="btn-save-subject-messages" class="px-4 py-2 text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl font-medium cursor-pointer">儲存領域提示語</button>
       </div>
     </div>
   </div>
 
-  <!-- 5. Warning Messages Config Modal (紅色系警示時間訊息) -->
+  <!-- 5. Warning Messages Config Modal -->
   <div id="modal-warning-messages" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-xl max-h-[90vh] flex flex-col border border-rose-200">
       <div class="flex items-center justify-between pb-3 border-b border-rose-100">
@@ -426,7 +438,7 @@
           <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600"></i>
           <span>設定警示時間訊息 (原班教室與科任教室警示提示)</span>
         </h3>
-        <button id="btn-close-warning-messages-modal" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button id="btn-close-warning-messages-modal" class="text-slate-400 hover:text-slate-600 cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
       <p class="text-xs text-rose-600/90 mt-2 mb-3">當倒數進入警示時間（如剩下 1 分鐘）時，看板將切換為紅色視覺並顯示此處設定的提醒語。</p>
       
@@ -451,8 +463,8 @@
       </div>
 
       <div class="mt-4 pt-3 border-t border-rose-100 flex justify-between items-center">
-        <button id="btn-reset-warning-messages" class="text-xs text-rose-600 hover:underline">還原預設提示語</button>
-        <button id="btn-save-warning-messages" class="px-4 py-2 text-xs text-white bg-rose-600 hover:bg-rose-700 rounded-xl font-medium shadow-sm">儲存警示訊息</button>
+        <button id="btn-reset-warning-messages" class="text-xs text-rose-600 hover:underline cursor-pointer">還原預設提示語</button>
+        <button id="btn-save-warning-messages" class="px-4 py-2 text-xs text-white bg-rose-600 hover:bg-rose-700 rounded-xl font-medium shadow-sm cursor-pointer">儲存警示訊息</button>
       </div>
     </div>
   </div>
@@ -466,9 +478,9 @@
           <span id="clothing-modal-day-title">選擇穿著</span>
         </h4>
         <div class="flex items-center space-x-1">
-          <button id="tab-clothing-select" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200">選擇穿著</button>
-          <button id="tab-clothing-manage" class="px-2.5 py-1 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100">管理/自訂服裝</button>
-          <button id="btn-close-clothing" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
+          <button id="tab-clothing-select" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 cursor-pointer">選擇穿著</button>
+          <button id="tab-clothing-manage" class="px-2.5 py-1 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer">管理/自訂服裝</button>
+          <button id="btn-close-clothing" class="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
       </div>
 
@@ -477,7 +489,7 @@
         <p class="text-xs text-slate-400">點擊下方服裝設定為該日穿著：</p>
         <div class="grid grid-cols-2 gap-2" id="clothing-options-container"></div>
         <div class="flex justify-between items-center pt-3 border-t border-slate-100 text-xs">
-          <button id="btn-clear-clothing" class="text-rose-500 hover:underline">清除該日穿著</button>
+          <button id="btn-clear-clothing" class="text-rose-500 hover:underline cursor-pointer">清除該日穿著</button>
           <span class="text-slate-400">如需自訂可切換管理標籤</span>
         </div>
       </div>
@@ -487,11 +499,11 @@
         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5">
           <div class="font-bold text-slate-700 flex items-center justify-between">
             <span id="clothing-form-title">新增服裝項目</span>
-            <button id="btn-reset-clothing-defaults" class="text-slate-400 hover:text-rose-600 text-[11px] underline">還原預設服裝</button>
+            <button id="btn-reset-clothing-defaults" class="text-slate-400 hover:text-rose-600 text-[11px] underline cursor-pointer">還原預設服裝</button>
           </div>
           <div class="flex space-x-2">
             <input type="text" id="input-new-clothing-name" placeholder="服裝名稱 (例: 班服)" class="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
-            <button id="btn-submit-clothing-form" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs">新增</button>
+            <button id="btn-submit-clothing-form" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs cursor-pointer">新增</button>
           </div>
           <div>
             <label class="block text-[11px] text-slate-500 mb-1">選擇服裝顏色：</label>
@@ -519,8 +531,8 @@
         <p id="confirm-modal-msg" class="text-xs text-slate-500 mt-1">確定要執行此動作嗎？</p>
       </div>
       <div class="flex items-center justify-center space-x-2 pt-2">
-        <button id="btn-confirm-cancel" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">取消</button>
-        <button id="btn-confirm-ok" class="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors">確定執行</button>
+        <button id="btn-confirm-cancel" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer">取消</button>
+        <button id="btn-confirm-ok" class="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors cursor-pointer">確定執行</button>
       </div>
     </div>
   </div>
@@ -553,7 +565,7 @@
       </div>
 
       <div class="flex items-center space-x-3 text-xs">
-        <button id="btn-toggle-sound" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">
+        <button id="btn-toggle-sound" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer">
           <i data-lucide="volume-2" id="sound-icon" class="w-4 h-4 text-emerald-400"></i>
           <span id="sound-text">提醒音：開</span>
         </button>
@@ -561,7 +573,7 @@
         <!-- Lead time select -->
         <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-lg">
           <span class="text-slate-400">首次提醒：</span>
-          <select id="select-lead-minutes" class="bg-slate-700 text-white rounded px-2 py-0.5 outline-none font-semibold">
+          <select id="select-lead-minutes" class="bg-slate-700 text-white rounded px-2 py-0.5 outline-none font-semibold cursor-pointer">
             <option value="1.5">1 分半 (90秒)</option>
             <option value="2">2 分鐘</option>
             <option value="3">3 分鐘</option>
@@ -577,7 +589,7 @@
             <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
             <span>警示時間：</span>
           </span>
-          <select id="select-warning-minutes" class="bg-slate-700 text-rose-300 rounded px-2 py-0.5 outline-none font-semibold">
+          <select id="select-warning-minutes" class="bg-slate-700 text-rose-300 rounded px-2 py-0.5 outline-none font-semibold cursor-pointer">
             <option value="0.5">30 秒</option>
             <option value="1" selected>1 分鐘</option>
             <option value="1.5">1 分半</option>
@@ -589,19 +601,18 @@
         <button id="btn-toggle-sim-bar" class="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer">
           <i data-lucide="sparkles" id="sim-btn-icon" class="w-3.5 h-3.5 text-slate-400"></i>
           <span id="sim-btn-text">模擬測試</span>
-          <span id="sim-btn-status" class="hidden ml-1 px-1.5 py-0.2 bg-amber-400 text-slate-950 font-bold rounded text-[10px]">開啟中</span>
         </button>
 
         <!-- Minimal Mode Button -->
-        <button id="btn-toggle-minimal-mode" class="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium shadow-sm">
+        <button id="btn-toggle-minimal-mode" class="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium shadow-sm cursor-pointer">
           <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
           <span>純淨看板模式</span>
         </button>
 
-        <button id="btn-toggle-fullscreen" class="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg">
+        <button id="btn-toggle-fullscreen" class="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg cursor-pointer">
           <i data-lucide="maximize" class="w-4 h-4"></i>
         </button>
-        <button id="btn-close-reminder" class="p-2 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg transition-colors">
+        <button id="btn-close-reminder" class="p-2 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -614,14 +625,14 @@
           <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i>
           <span>時間模擬中：</span>
         </span>
-        <button id="btn-sim-reallife" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded font-medium">真實時間</button>
-        <button id="btn-sim-break" class="px-2.5 py-1 bg-amber-600/40 hover:bg-amber-600 text-amber-100 rounded border border-amber-500/50">模擬「下課課前4分鐘」</button>
-        <button id="btn-sim-warning" class="px-2.5 py-1 bg-rose-600/40 hover:bg-rose-600 text-rose-100 rounded border border-rose-500/50">模擬「紅色警示課前45秒」</button>
-        <button id="btn-sim-class" class="px-2.5 py-1 bg-emerald-600/40 hover:bg-emerald-600 text-emerald-100 rounded border border-emerald-500/50">模擬「上課專心中」</button>
+        <button id="btn-sim-reallife" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded font-medium cursor-pointer">真實時間</button>
+        <button id="btn-sim-break" class="px-2.5 py-1 bg-amber-600/40 hover:bg-amber-600 text-amber-100 rounded border border-amber-500/50 cursor-pointer">模擬「下課課前4分鐘」</button>
+        <button id="btn-sim-warning" class="px-2.5 py-1 bg-rose-600/40 hover:bg-rose-600 text-rose-100 rounded border border-rose-500/50 cursor-pointer">模擬「紅色警示課前45秒」</button>
+        <button id="btn-sim-class" class="px-2.5 py-1 bg-emerald-600/40 hover:bg-emerald-600 text-emerald-100 rounded border border-emerald-500/50 cursor-pointer">模擬「上課專心中」</button>
       </div>
       <div class="flex items-center space-x-2">
         <span>自選星期：</span>
-        <select id="sim-select-weekday" class="bg-indigo-900 border border-indigo-700 text-white rounded px-2 py-0.5">
+        <select id="sim-select-weekday" class="bg-indigo-900 border border-indigo-700 text-white rounded px-2 py-0.5 cursor-pointer">
           <option value="1">星期一</option>
           <option value="2">星期二</option>
           <option value="3">星期三</option>
@@ -629,7 +640,7 @@
           <option value="5">星期五</option>
         </select>
         <span>自訂時間：</span>
-        <input type="time" id="sim-custom-time" class="bg-indigo-900 border border-indigo-700 text-white rounded px-2 py-0.5">
+        <input type="time" id="sim-custom-time" class="bg-indigo-900 border border-indigo-700 text-white rounded px-2 py-0.5 cursor-pointer">
       </div>
     </div>
 
@@ -648,7 +659,7 @@
   </div>
 
   <script>
-    /* 8 Standard Colors (無粉紅、深綠、深藍，新增奶茶色) */
+    /* 8 Standard Colors */
     const PRESET_COLOR_PALETTES = [
       { key: 'red', label: '紅', bg: '#fee2e2', text: '#b91c1c', border: '#fca5a5' },
       { key: 'orange', label: '橙', bg: '#ffedd5', text: '#c2410c', border: '#fed7aa' },
@@ -680,7 +691,6 @@
       { name: '健康', room: '原班教室', preMsg: '請準備健康課本與上課所需文具', inMsg: '學習身心健康觀念，培養良好生活好習慣' },
     ];
 
-    // 依現有課程依序搭配 8 種標準顏色
     const DEFAULT_SUBJECTS = SUBJECT_DEFINITIONS.map((def, idx) => {
       const color = PRESET_COLOR_PALETTES[idx % PRESET_COLOR_PALETTES.length];
       return {
@@ -798,7 +808,6 @@
       },
     ];
 
-    // 預設服裝：運動服黃色、校服淺綠色、便服紫色、班服紅色
     const DEFAULT_CLOTHING_TYPES = [
       { id: 'cloth-1', name: '制服', bg: '#e0f2fe', text: '#0369a1', border: '#7dd3fc' },
       { id: 'cloth-2', name: '運動服', bg: '#fef9c3', text: '#a16207', border: '#fde047' },
@@ -807,7 +816,8 @@
       { id: 'cloth-5', name: '班服', bg: '#fee2e2', text: '#b91c1c', border: '#fca5a5' },
     ];
 
-    // In-memory application state
+    const LOCAL_STORAGE_KEY = 'smart_classroom_schedule_data_v1';
+
     const AppState = {
       subjects: JSON.parse(JSON.stringify(DEFAULT_SUBJECTS)),
       periods: JSON.parse(JSON.stringify(DEFAULT_PERIODS)),
@@ -829,18 +839,78 @@
       currentSelectedSubject: null,
       isDeleteSubjectMode: false,
       activeClothingDay: null,
-      selectedClothingColor: PRESET_COLOR_PALETTES[3], // 淺綠
+      selectedClothingColor: PRESET_COLOR_PALETTES[3],
       
-      // Reminder & Warning State
       reminderSound: true,
       leadMinutes: 5,
-      warningMinutes: 1, // 預設 1 分鐘警示時間
+      warningMinutes: 1,
       warningMsgHome: '請於上課鐘響前就坐，並備妥學用品，準備上課!!',
       warningMsgOutside: '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!',
-      simulatedMode: false, // 預設使用真實時間
+      simulatedMode: false,
       simulatedDate: null,
       lastChimeTimestamp: null,
     };
+
+    let autosaveTimer = null;
+    function saveToLocalStorage() {
+      try {
+        const payload = {
+          subjects: AppState.subjects,
+          periods: AppState.periods,
+          scheduleTitle: AppState.scheduleTitle,
+          scheduleSubtitle: AppState.scheduleSubtitle,
+          clothingTypes: AppState.clothingTypes,
+          clothing: AppState.clothing,
+          grid: AppState.grid,
+          warningMsgHome: AppState.warningMsgHome,
+          warningMsgOutside: AppState.warningMsgOutside,
+          leadMinutes: AppState.leadMinutes,
+          warningMinutes: AppState.warningMinutes,
+          reminderSound: AppState.reminderSound
+        };
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
+        
+        // Show gentle toast feedback
+        const toast = document.getElementById('autosave-toast');
+        if (toast) {
+          clearTimeout(autosaveTimer);
+          toast.classList.remove('opacity-0', 'translate-y-2');
+          toast.classList.add('opacity-100', 'translate-y-0');
+          autosaveTimer = setTimeout(() => {
+            toast.classList.remove('opacity-100', 'translate-y-0');
+            toast.classList.add('opacity-0', 'translate-y-2');
+          }, 1500);
+        }
+      } catch (e) {
+        console.warn('LocalStorage save error:', e);
+      }
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (!saved) return false;
+        const data = JSON.parse(saved);
+        if (data && typeof data === 'object') {
+          if (Array.isArray(data.subjects) && data.subjects.length > 0) AppState.subjects = data.subjects;
+          if (Array.isArray(data.periods) && data.periods.length > 0) AppState.periods = data.periods;
+          if (data.scheduleTitle) AppState.scheduleTitle = data.scheduleTitle;
+          if (data.scheduleSubtitle !== undefined) AppState.scheduleSubtitle = data.scheduleSubtitle;
+          if (Array.isArray(data.clothingTypes) && data.clothingTypes.length > 0) AppState.clothingTypes = data.clothingTypes;
+          if (data.clothing) AppState.clothing = data.clothing;
+          if (data.grid) AppState.grid = data.grid;
+          if (data.warningMsgHome) AppState.warningMsgHome = data.warningMsgHome;
+          if (data.warningMsgOutside) AppState.warningMsgOutside = data.warningMsgOutside;
+          if (data.leadMinutes) AppState.leadMinutes = data.leadMinutes;
+          if (data.warningMinutes) AppState.warningMinutes = data.warningMinutes;
+          if (data.reminderSound !== undefined) AppState.reminderSound = data.reminderSound;
+          return true;
+        }
+      } catch (e) {
+        console.error('LocalStorage load failed:', e);
+      }
+      return false;
+    }
 
     function renderSubjectPalette() {
       const container = document.getElementById('subject-palette-container');
@@ -927,6 +997,7 @@
         AppState.currentSelectedSubject = null;
       }
       renderSubjectPalette();
+      saveToLocalStorage();
     }
 
     function renderScheduleGrid() {
@@ -1019,7 +1090,7 @@
           cellTd.className = 'py-2 px-1.5 sm:px-2 border-r border-slate-100 last:border-r-0 h-16 align-middle relative transition-colors cursor-pointer';
           cellTd.dataset.cellKey = cellKey;
 
-          // Special: Lunch & Nap Periods (午餐時間與午休時間皆留白，不開放填寫課程)
+          // Special: Lunch & Nap Periods (Both stay blank and not fillable)
           if (period.id === 'p-lunch' || period.id === 'p-nap' || period.type === 'break') {
             const blankTd = document.createElement('td');
             blankTd.className = 'py-2 px-1.5 sm:px-2 border-r border-slate-100 last:border-r-0 h-12 bg-slate-50/40 select-none';
@@ -1049,6 +1120,7 @@
               } else {
                 delete AppState.grid[cellKey];
               }
+              saveToLocalStorage();
             });
 
             tr.appendChild(cellTd);
@@ -1093,6 +1165,7 @@
               }
             }
             renderScheduleGrid();
+            saveToLocalStorage();
           });
 
           cellTd.addEventListener('dragover', (e) => {
@@ -1110,6 +1183,7 @@
               if (data && data.name) {
                 AppState.grid[cellKey] = data.name;
                 renderScheduleGrid();
+                saveToLocalStorage();
               }
             } catch (err) {
               console.error(err);
@@ -1192,6 +1266,7 @@
             AppState.clothing[AppState.activeClothingDay] = c.name;
             renderScheduleGrid();
             closeClothingPicker();
+            saveToLocalStorage();
           }
         };
         container.appendChild(btn);
@@ -1213,7 +1288,7 @@
             <input type="text" value="${cloth.name}" data-id="${cloth.id}" class="edit-clothing-name font-bold text-slate-700 outline-none border-b border-transparent focus:border-indigo-500 bg-transparent px-1 py-0.5 w-24">
           </div>
           <div class="flex items-center space-x-1.5">
-            <select data-id="${cloth.id}" class="edit-clothing-color-select bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-600 font-medium">
+            <select data-id="${cloth.id}" class="edit-clothing-color-select bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-600 font-medium cursor-pointer">
               ${PRESET_COLOR_PALETTES.map(p => `
                 <option value="${p.key}" ${cloth.text === p.text ? 'selected' : ''}>${p.label}</option>
               `).join('')}
@@ -1229,6 +1304,7 @@
           cloth.name = e.target.value.trim() || cloth.name;
           renderClothingOptions();
           renderScheduleGrid();
+          saveToLocalStorage();
         });
 
         const colorSelect = row.querySelector('.edit-clothing-color-select');
@@ -1241,6 +1317,7 @@
             renderClothingManageList();
             renderClothingOptions();
             renderScheduleGrid();
+            saveToLocalStorage();
           }
         });
 
@@ -1250,6 +1327,7 @@
           renderClothingManageList();
           renderClothingOptions();
           renderScheduleGrid();
+          saveToLocalStorage();
         });
 
         listContainer.appendChild(row);
@@ -1288,13 +1366,13 @@
       if (tab === 'select') {
         selectView.classList.remove('hidden');
         manageView.classList.add('hidden');
-        tabSelect.className = 'px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200';
-        tabManage.className = 'px-2.5 py-1 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100';
+        tabSelect.className = 'px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 cursor-pointer';
+        tabManage.className = 'px-2.5 py-1 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer';
       } else {
         selectView.classList.add('hidden');
         manageView.classList.remove('hidden');
-        tabManage.className = 'px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200';
-        tabSelect.className = 'px-2.5 py-1 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100';
+        tabManage.className = 'px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 cursor-pointer';
+        tabSelect.className = 'px-2.5 py-1 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer';
       }
     }
 
@@ -1362,6 +1440,7 @@
         }
       }
       renderScheduleGrid();
+      saveToLocalStorage();
       const modal = document.getElementById('modal-periods');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
@@ -1398,6 +1477,7 @@
           target.room = inp.value.trim() || '原班教室';
         }
       });
+      saveToLocalStorage();
       const modal = document.getElementById('modal-classrooms');
       if (modal) {
         modal.classList.add('hidden');
@@ -1460,6 +1540,7 @@
           }
         }
       }
+      saveToLocalStorage();
       const modal = document.getElementById('modal-subject-messages');
       if (modal) {
         modal.classList.add('hidden');
@@ -1608,7 +1689,7 @@
         return;
       }
 
-      // SCENARIO 1: Lunch or Nap Break
+      // SCENARIO 1: Lunch or Nap In-progress Break
       if (currentPeriod && (currentPeriod.type === 'break' || currentPeriod.id === 'p-lunch' || currentPeriod.id === 'p-nap')) {
         const leadSecLimit = AppState.leadMinutes * 60;
         const pEndSec = parseTimeToSeconds(currentPeriod.endTime);
@@ -1660,7 +1741,7 @@
         }
       }
 
-      // SCENARIO 2: In Class (Non-blinking stable badge)
+      // SCENARIO 2: In Class
       if (currentPeriod && currentPeriod.type !== 'break') {
         container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
         const cellKey = `${currentPeriod.id}-${currentDay}`;
@@ -1745,7 +1826,6 @@
 
           let contentHtml = '';
           if (isNextNap) {
-            // 午休專屬警示：無地點欄位
             contentHtml = `
               <div class="w-full max-w-lg bg-rose-900/50 border-2 border-rose-400/80 p-5 rounded-2xl text-center mb-5 shadow-md">
                 <div class="flex items-center justify-center space-x-2 text-rose-200 text-sm font-bold mb-1">
@@ -1756,7 +1836,6 @@
               </div>
             `;
           } else {
-            // 一般課程警示：含地點與學用品叮嚀
             contentHtml = `
               <div class="w-full max-w-lg bg-rose-900/50 border-2 border-rose-400/80 p-5 rounded-2xl text-left mb-5 shadow-md">
                 <div class="flex items-center space-x-3.5">
@@ -1800,7 +1879,6 @@
           
           let contentHtml = '';
           if (isNextNap) {
-            // 午休專屬首次提醒：無地點欄位
             contentHtml = `
               <div class="w-full max-w-lg bg-amber-500/10 border-2 border-amber-500/40 p-5 rounded-2xl text-center mb-5">
                 <div class="flex items-center justify-center space-x-2 text-amber-200 text-sm font-bold mb-1">
@@ -1811,7 +1889,6 @@
               </div>
             `;
           } else {
-            // 一般課程首次提醒：含地點欄位
             contentHtml = `
               <div class="w-full max-w-lg bg-amber-500/10 border-2 border-amber-500/40 p-5 rounded-2xl text-left mb-5">
                 <div class="flex items-center space-x-3.5">
@@ -1855,7 +1932,6 @@
           
           let middleInfoHtml = '';
           if (isNextNap) {
-            // 午休前普通休息：無地點欄位
             middleInfoHtml = `
               <div class="flex items-center justify-center space-x-3 text-slate-100 text-base sm:text-xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-5 shadow-md">
                 <i data-lucide="moon" class="w-5 h-5 text-indigo-400 shrink-0"></i>
@@ -1863,7 +1939,6 @@
               </div>
             `;
           } else {
-            // 一般課程普通休息：含地點欄位
             middleInfoHtml = `
               <div class="flex items-center justify-center space-x-3 text-slate-100 text-lg sm:text-2xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-5 shadow-md">
                 <i data-lucide="map-pin" class="w-6 h-6 text-indigo-400 shrink-0"></i>
@@ -1897,6 +1972,9 @@
     }
 
     function initApp() {
+      // 1. Prioritize restoring saved schedule from localStorage
+      loadFromLocalStorage();
+
       renderSubjectPalette();
       renderScheduleGrid();
       initClothingColorPalettes();
@@ -1916,11 +1994,13 @@
       titleInput.addEventListener('input', (e) => {
         AppState.scheduleTitle = e.target.value.trim() || '我的每週課表';
         titleDisplay.innerText = AppState.scheduleTitle;
+        saveToLocalStorage();
       });
 
       subtitleInput.addEventListener('input', (e) => {
         AppState.scheduleSubtitle = e.target.value.trim() || '';
         subtitleDisplay.innerText = AppState.scheduleSubtitle;
+        saveToLocalStorage();
       });
 
       // Clear Grid Button
@@ -1928,6 +2008,7 @@
         showConfirmDialog('清空課表確認', '確定要清空課表內的所有課程與活動填寫嗎？', () => {
           AppState.grid = {};
           renderScheduleGrid();
+          saveToLocalStorage();
         });
       });
 
@@ -1976,6 +2057,7 @@
                 renderScheduleGrid();
                 renderClothingOptions();
                 initClothingColorPalettes();
+                saveToLocalStorage();
               });
             }
           } catch (err) {
@@ -1986,7 +2068,7 @@
         reader.readAsText(file);
       });
 
-      // Export PNG with Absolute Geometry & Baseline Compensation Fix
+      // Export PNG with Absolute Geometry & Baseline Compensation
       document.getElementById('btn-export-png').addEventListener('click', async () => {
         const target = document.getElementById('schedule-export-wrapper');
         const btn = document.getElementById('btn-export-png');
@@ -2051,7 +2133,6 @@
               });
             });
 
-            // 注入針對 Canvas 中文字型光學置中補償專屬樣式
             const exportStyle = clonedDoc.createElement('style');
             exportStyle.innerHTML = `
               .schedule-badge-outer {
@@ -2108,6 +2189,7 @@
         showConfirmDialog('還原預設領域', '確定要將領域清單恢復為系統預設項目嗎？', () => {
           AppState.subjects = JSON.parse(JSON.stringify(DEFAULT_SUBJECTS));
           renderSubjectPalette();
+          saveToLocalStorage();
         });
       });
 
@@ -2160,6 +2242,7 @@
           inMsg: '請保持安靜，認真聽講並主動思考'
         });
         renderSubjectPalette();
+        saveToLocalStorage();
         modalAddSubject.classList.add('hidden');
         modalAddSubject.classList.remove('flex');
       });
@@ -2181,6 +2264,7 @@
           AppState.periods = JSON.parse(JSON.stringify(DEFAULT_PERIODS));
           renderPeriodsEditor();
           renderScheduleGrid();
+          saveToLocalStorage();
         });
       });
 
@@ -2238,7 +2322,7 @@
         btnSaveSubjectMessages.addEventListener('click', saveSubjectMessagesFromEditor);
       }
 
-      // Warning Messages Modal (Red theme)
+      // Warning Messages Modal
       const modalWarningMessages = document.getElementById('modal-warning-messages');
       const btnOpenWarningMessages = document.getElementById('btn-open-warning-messages-modal');
       const btnCloseWarningMessages = document.getElementById('btn-close-warning-messages-modal');
@@ -2269,6 +2353,7 @@
         btnSaveWarningMessages.addEventListener('click', () => {
           AppState.warningMsgHome = inputWarnHome.value.trim() || '請於上課鐘響前就坐，並備妥學用品，準備上課!!';
           AppState.warningMsgOutside = inputWarnOutside.value.trim() || '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!';
+          saveToLocalStorage();
           if (modalWarningMessages) {
             modalWarningMessages.classList.add('hidden');
             modalWarningMessages.classList.remove('flex');
@@ -2303,6 +2388,7 @@
           renderClothingManageList();
           renderClothingOptions();
           renderScheduleGrid();
+          saveToLocalStorage();
         };
       }
 
@@ -2314,6 +2400,7 @@
             renderClothingManageList();
             renderClothingOptions();
             renderScheduleGrid();
+            saveToLocalStorage();
           });
         };
       }
@@ -2331,6 +2418,7 @@
             delete AppState.clothing[AppState.activeClothingDay];
             renderScheduleGrid();
             closeClothingPicker();
+            saveToLocalStorage();
           }
         };
       }
@@ -2339,7 +2427,6 @@
       const reminderOverlay = document.getElementById('reminder-board-overlay');
       document.getElementById('btn-open-reminder').addEventListener('click', () => {
         reminderOverlay.classList.remove('hidden');
-        // 預設進入為真實時間，不開啟模擬測試
         AppState.simulatedMode = false;
         AppState.simulatedDate = null;
         if (simBar) simBar.classList.add('hidden');
@@ -2390,7 +2477,6 @@
         });
       }
 
-      // Keyboard Esc to exit minimal mode or close fullscreen
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && !reminderOverlay.classList.contains('hidden')) {
           if (reminderOverlay.classList.contains('minimal-mode')) {
@@ -2399,11 +2485,9 @@
         }
       });
 
-      // Double click stage background to toggle minimal mode
       const liveStage = reminderOverlay.querySelector('.flex-1');
       if (liveStage) {
         liveStage.addEventListener('dblclick', (e) => {
-          // If not clicked inside the status container, toggle minimal mode
           if (!e.target.closest('#board-status-container')) {
             const isCurrentlyMinimal = reminderOverlay.classList.contains('minimal-mode');
             setMinimalMode(!isCurrentlyMinimal);
@@ -2436,11 +2520,13 @@
           soundIcon.className = 'w-4 h-4 text-slate-500';
           soundText.innerText = '提醒音：關';
         }
+        saveToLocalStorage();
       });
 
       // Lead minutes select & custom input
       const selectLead = document.getElementById('select-lead-minutes');
       const inputCustomLead = document.getElementById('input-custom-lead-minutes');
+      selectLead.value = String(AppState.leadMinutes);
       selectLead.addEventListener('change', (e) => {
         if (e.target.value === 'custom') {
           inputCustomLead.classList.remove('hidden');
@@ -2449,6 +2535,7 @@
           inputCustomLead.classList.add('hidden');
           AppState.leadMinutes = parseFloat(e.target.value);
         }
+        saveToLocalStorage();
         updateReminderBoard();
       });
 
@@ -2456,6 +2543,7 @@
         const val = parseFloat(e.target.value);
         if (!isNaN(val) && val > 0) {
           AppState.leadMinutes = val;
+          saveToLocalStorage();
           updateReminderBoard();
         }
       });
@@ -2464,6 +2552,7 @@
       const selectWarning = document.getElementById('select-warning-minutes');
       const inputCustomWarning = document.getElementById('input-custom-warning-minutes');
       if (selectWarning && inputCustomWarning) {
+        selectWarning.value = String(AppState.warningMinutes);
         selectWarning.addEventListener('change', (e) => {
           if (e.target.value === 'custom') {
             inputCustomWarning.classList.remove('hidden');
@@ -2472,6 +2561,7 @@
             inputCustomWarning.classList.add('hidden');
             AppState.warningMinutes = parseFloat(e.target.value);
           }
+          saveToLocalStorage();
           updateReminderBoard();
         });
 
@@ -2479,6 +2569,7 @@
           const val = parseFloat(e.target.value);
           if (!isNaN(val) && val > 0) {
             AppState.warningMinutes = val;
+            saveToLocalStorage();
             updateReminderBoard();
           }
         });
@@ -2502,7 +2593,6 @@
         }
       }
 
-      // Initial state: 預設為真實時間，模擬按鈕與橫幅維持關閉
       const simSelectWeekday = document.getElementById('sim-select-weekday');
       const simCustomTime = document.getElementById('sim-custom-time');
       if (simSelectWeekday) simSelectWeekday.value = "1";
@@ -2538,7 +2628,7 @@
       document.getElementById('btn-sim-break').addEventListener('click', () => {
         AppState.simulatedMode = true;
         const d = new Date();
-        d.setHours(9, 16, 0); // 09:16 (4 mins before 09:20 period 2)
+        d.setHours(9, 16, 0);
         AppState.simulatedDate = d;
         document.getElementById('sim-select-weekday').value = "1";
         document.getElementById('sim-custom-time').value = "09:16";
@@ -2550,7 +2640,7 @@
         btnSimWarning.addEventListener('click', () => {
           AppState.simulatedMode = true;
           const d = new Date();
-          d.setHours(9, 19, 15); // 09:19:15 (45s before 09:20 period 2)
+          d.setHours(9, 19, 15);
           AppState.simulatedDate = d;
           document.getElementById('sim-select-weekday').value = "1";
           document.getElementById('sim-custom-time').value = "09:19";
