@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智慧課表產生器與課堂提醒系統</title>
+  <title>智慧課表產生器與課堂提醒看板</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- html2canvas for PNG export -->
@@ -48,7 +48,7 @@
       outline-offset: -2px;
     }
 
-    /* Course card table-cell vertical centering utility - Immune to canvas baseline shifts */
+    /* Course card table-cell vertical centering utility */
     .schedule-badge-outer {
       display: table !important;
       width: 100%;
@@ -125,20 +125,9 @@
     .minimal-mode #minimal-floating-bar {
       display: flex !important;
     }
-
-    /* Auto-save toast notification */
-    #autosave-toast {
-      transition: opacity 0.3s ease, transform 0.3s ease;
-    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
-
-  <!-- Auto-save notification badge -->
-  <div id="autosave-toast" class="fixed bottom-5 right-5 z-50 bg-slate-900/90 text-emerald-400 text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-700/80 shadow-lg flex items-center space-x-1.5 opacity-0 pointer-events-none transform translate-y-2">
-    <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
-    <span>已自動儲存於本機</span>
-  </div>
 
   <header class="no-print bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -148,7 +137,7 @@
           <i data-lucide="calendar-days" class="w-5 h-5"></i>
         </div>
         <div>
-          <h1 class="text-lg font-bold text-slate-800 leading-tight">課表產生器</h1>
+          <h1 class="text-lg font-bold text-slate-800 leading-tight">智慧課表產生器</h1>
           <p class="text-xs text-slate-400 font-medium">智慧課堂叮嚀與電子看板系統</p>
         </div>
       </div>
@@ -161,12 +150,12 @@
           <span class="sm:hidden">提醒看板</span>
         </button>
 
-        <button id="btn-export-json" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer" title="將課表設定檔備份成 JSON 檔">
+        <button id="btn-export-json" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer">
           <i data-lucide="file-down" class="w-4 h-4 text-slate-500"></i>
           <span class="hidden lg:inline">匯出課表</span>
         </button>
 
-        <button id="btn-trigger-import" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer" title="從 JSON 檔還原課表">
+        <button id="btn-trigger-import" class="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer">
           <i data-lucide="file-up" class="w-4 h-4 text-slate-500"></i>
           <span class="hidden lg:inline">匯入課表</span>
         </button>
@@ -199,17 +188,17 @@
         <!-- Tips Banner -->
         <div class="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4.5 text-xs text-indigo-900 leading-relaxed shadow-sm">
           <div class="flex items-start space-x-2.5">
-            <div class="p-1 bg-indigo-200/60 text-indigo-700 rounded-lg mt-0.5 shrink-0">
+            <div class="p-1 bg-indigo-200/60 text-indigo-700 rounded-lg mt-0.5">
               <i data-lucide="info" class="w-4 h-4"></i>
             </div>
             <div>
               <h4 class="font-bold text-sm text-indigo-950 mb-1.5">操作說明：</h4>
               <ol class="space-y-1 text-indigo-800 list-decimal list-inside">
-                <li><strong class="font-semibold text-indigo-950">自動存檔</strong>：所有排課與設定皆即時儲存於本機瀏覽器。</li>
                 <li><strong class="font-semibold text-indigo-950">點選置入</strong>：先點選下方領域，再點擊課表格子放入。</li>
-                <li><strong class="font-semibold text-indigo-950">拖曳置入</strong>：按住領域卡片直接拖曳至格子內。</li>
-                <li><strong class="font-semibold text-indigo-950">點擊清除</strong>：點選已安排的格子可將該節清空。</li>
+                <li><strong class="font-semibold text-indigo-950">切換放學</strong>：未選取領域時，點擊空白「+」切換為放學並連動後續節次。</li>
+                <li><strong class="font-semibold text-indigo-950">點擊清除</strong>：點選已安排的課程格子可清空該節。</li>
                 <li><strong class="font-semibold text-indigo-950">晨間活動</strong>：晨間時段支援直接點入輸入文字。</li>
+                <li><strong class="font-semibold text-indigo-950">午休時段</strong>：午休時間開放彈性排課，留空預設為午休。</li>
               </ol>
             </div>
           </div>
@@ -570,7 +559,7 @@
           <span id="sound-text">提醒音：開</span>
         </button>
 
-        <!-- Lead time select -->
+        <!-- Lead time select (首次提醒) -->
         <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-lg">
           <span class="text-slate-400">首次提醒：</span>
           <select id="select-lead-minutes" class="bg-slate-700 text-white rounded px-2 py-0.5 outline-none font-semibold cursor-pointer">
@@ -583,7 +572,7 @@
           <input type="number" id="input-custom-lead-minutes" min="0.5" max="30" step="0.5" value="5" placeholder="分" class="hidden w-16 bg-slate-700 border border-slate-600 text-white rounded px-2 py-0.5 outline-none font-mono text-xs">
         </div>
 
-        <!-- Warning time select (Red alert mode) -->
+        <!-- Warning time select (警示時間) -->
         <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-lg border border-rose-500/40">
           <span class="text-rose-400 font-semibold flex items-center space-x-1">
             <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
@@ -598,27 +587,28 @@
           <input type="number" id="input-custom-warning-minutes" min="0.2" max="10" step="0.1" value="1" placeholder="分" class="hidden w-16 bg-slate-700 border border-rose-500 text-white rounded px-2 py-0.5 outline-none font-mono text-xs">
         </div>
 
-        <button id="btn-toggle-sim-bar" class="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer">
+        <!-- Simulation Button (預設未開啟，簡潔單行無多餘標籤) -->
+        <button id="btn-toggle-sim-bar" class="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer whitespace-nowrap">
           <i data-lucide="sparkles" id="sim-btn-icon" class="w-3.5 h-3.5 text-slate-400"></i>
           <span id="sim-btn-text">模擬測試</span>
         </button>
 
         <!-- Minimal Mode Button -->
-        <button id="btn-toggle-minimal-mode" class="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium shadow-sm cursor-pointer">
+        <button id="btn-toggle-minimal-mode" class="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium shadow-sm cursor-pointer whitespace-nowrap">
           <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
           <span>純淨看板模式</span>
         </button>
 
-        <button id="btn-toggle-fullscreen" class="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg cursor-pointer">
+        <button id="btn-toggle-fullscreen" title="切換全螢幕" class="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg cursor-pointer">
           <i data-lucide="maximize" class="w-4 h-4"></i>
         </button>
-        <button id="btn-close-reminder" class="p-2 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer">
+        <button id="btn-close-reminder" title="關閉看板" class="p-2 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
     </div>
 
-    <!-- Simulation Bar -->
+    <!-- Simulation Bar (預設收合) -->
     <div id="sim-controls-bar" class="hidden bg-indigo-950/80 border-b border-indigo-800/60 px-6 py-2.5 flex flex-wrap items-center justify-between text-xs text-indigo-200">
       <div class="flex items-center space-x-3 mb-1 sm:mb-0">
         <span class="font-bold text-amber-300 flex items-center space-x-1">
@@ -626,8 +616,8 @@
           <span>時間模擬中：</span>
         </span>
         <button id="btn-sim-reallife" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded font-medium cursor-pointer">真實時間</button>
-        <button id="btn-sim-break" class="px-2.5 py-1 bg-amber-600/40 hover:bg-amber-600 text-amber-100 rounded border border-amber-500/50 cursor-pointer">模擬「下課課前4分鐘」</button>
-        <button id="btn-sim-warning" class="px-2.5 py-1 bg-rose-600/40 hover:bg-rose-600 text-rose-100 rounded border border-rose-500/50 cursor-pointer">模擬「紅色警示課前45秒」</button>
+        <button id="btn-sim-break" class="px-2.5 py-1 bg-amber-600/40 hover:bg-amber-600 text-amber-100 rounded border border-amber-500/50 cursor-pointer">模擬「課前首次提醒 (4分)」</button>
+        <button id="btn-sim-warning" class="px-2.5 py-1 bg-rose-600/40 hover:bg-rose-600 text-rose-100 rounded border border-rose-500/50 cursor-pointer">模擬「紅色警示 (45秒)」</button>
         <button id="btn-sim-class" class="px-2.5 py-1 bg-emerald-600/40 hover:bg-emerald-600 text-emerald-100 rounded border border-emerald-500/50 cursor-pointer">模擬「上課專心中」</button>
       </div>
       <div class="flex items-center space-x-2">
@@ -671,22 +661,23 @@
       { key: 'gray', label: '灰', bg: '#f1f5f9', text: '#475569', border: '#cbd5e1' },
     ];
 
+    /* 最新 6 項地點與 5 項上課中提示詞之標準領域定義 */
     const SUBJECT_DEFINITIONS = [
-      { name: '國語', room: '原班教室', preMsg: '請準備好國語課本、習作與上課所需文具', inMsg: '認真朗讀課文，主動舉手發表' },
-      { name: '數學', room: '原班教室', preMsg: '請準備好數學課本、習作、八格本與上課所需文具', inMsg: '仔細計算、主動驗算，跟上老師解題思考' },
+      { name: '國語', room: '原班教室', preMsg: '請準備好國語課本、習作與上課所需文具', inMsg: '認真朗讀課文，用心學習，踴躍舉手發表' },
+      { name: '數學', room: '原班教室', preMsg: '請準備好數學課本、習作、八格本與上課所需文具', inMsg: '用心學習，仔細計算，有問題時舉手發問' },
       { name: '英語', room: '英語教室', preMsg: '請攜帶英語課本、作業本、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '勇敢大聲開口說英語，積極參與互動' },
-      { name: '自然', room: '自然教室', preMsg: '請攜帶自然課本、習作、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '遵守實驗室安全規則，細心觀察與記錄' },
-      { name: '社會', room: '社會教室', preMsg: '請攜帶社會課本、習作、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '認真閱讀圖表資料，專注探究社會議題' },
-      { name: '體育', room: '操場 / 活動中心', preMsg: '請備妥個人運動器材及水壺，班長整隊後，帶隊前往集合地點', inMsg: '充分做好暖身運動，聽從指令、注意運動安全' },
-      { name: '音樂', room: '音樂教室(二)', preMsg: '請攜帶樂譜、直笛及水壺，班長整隊後，帶隊前往上課教室', inMsg: '用心聆聽音樂旋律，齊聲和諧合唱與吹奏' },
+      { name: '自然', room: '自然教室', preMsg: '請攜帶自然課本、習作、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '遵守課堂規則用心學習，參與實驗時細心觀察' },
+      { name: '社會', room: '社會教室', preMsg: '請攜帶社會課本、習作、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '遵守課堂規則用心學習，並積極參與互動' },
+      { name: '體育', room: '操場 / 籃球場', preMsg: '請備妥個人運動器材及水壺，班長整隊後，帶隊前往集合地點', inMsg: '充分做好暖身運動，聽從指令、注意運動安全' },
+      { name: '音樂', room: '社會教室', preMsg: '請攜帶樂譜、直笛及水壺，班長整隊後，帶隊前往上課教室', inMsg: '用心聆聽音樂旋律，齊聲和諧合唱與吹奏' },
       { name: '藝術', room: '原班教室', preMsg: '請備妥藝術課所需用品', inMsg: '發揮創意大膽創作，保持桌面與環境整潔' },
-      { name: '資訊', room: '電腦教室', preMsg: '請班長整隊後，帶隊前往電腦教室，勿攜帶飲用水', inMsg: '愛惜電腦設備，不隨意瀏覽非學習網頁' },
-      { name: '社團', room: '社團活動分組教室', preMsg: '請攜帶社團專屬用品與水壺，至各社團上課地點集合', inMsg: '積極投入社團訓練，展現團隊合作精神' },
+      { name: '資訊', room: '電腦教室', preMsg: '請班長整隊後，帶隊前往電腦教室，勿攜帶飲用水', inMsg: '愛惜電腦設備，遵守上課規則，不隨意瀏覽非學習網頁' },
+      { name: '社團', room: '各社團上課地點', preMsg: '請攜帶社團專屬用品與水壺，至各社團上課地點集合', inMsg: '積極投入社團訓練，展現團隊合作精神' },
       { name: '綜合', room: '原班教室', preMsg: '請備妥綜合課本與上課所需文具', inMsg: '熱烈參與小組合作，傾聽他人意見' },
-      { name: '本土', room: '原班教室', preMsg: '請準備本土語課本、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '大聲開口講母語，認識本土文化之美' },
+      { name: '本土', room: '英語教室', preMsg: '請準備本土語課本、水壺及所需文具，班長整隊後，帶隊前往上課教室', inMsg: '大聲開口講母語，認識本土文化之美' },
       { name: '海洋', room: '原班教室', preMsg: '請準備平板及所需文具', inMsg: '能安靜聆聽老師上課，並用心完成各項任務，同時熱烈參與討論' },
-      { name: '律動', room: '韻律教室 / 活動中心', preMsg: '請攜帶水壺，班長整隊後，帶隊前往上課地點', inMsg: '跟隨節奏律動伸展，注意步伐與肢體安全' },
-      { name: '閱讀', room: '圖書館', preMsg: '請事先向老師確認今日上課的地點及所需準備之物品', inMsg: '輕聲細語、安靜沉浸於書香閱讀之中' },
+      { name: '律動', room: '多功能教室', preMsg: '請攜帶水壺，班長整隊後，帶隊前往上課地點', inMsg: '跟隨節奏律動伸展，注意步伐與肢體安全' },
+      { name: '閱讀', room: '原班教室', preMsg: '請事先向老師確認今日上課的地點及所需準備之物品', inMsg: '輕聲細語、安靜沉浸於書香閱讀之中' },
       { name: '議題', room: '原班教室', preMsg: '請事先向老師確認今日上課的地點及所需準備之物品', inMsg: '關心多元議題，理性思考並主動發表觀點' },
       { name: '健康', room: '原班教室', preMsg: '請準備健康課本與上課所需文具', inMsg: '學習身心健康觀念，培養良好生活好習慣' },
     ];
@@ -772,7 +763,7 @@
         startTime: '12:30', 
         endTime: '13:20', 
         icon: 'moon', 
-        type: 'break',
+        type: 'class', /* 開放彈性排課，留空時預設視為午休 */
         inClassMsg: '午休請保持安靜，放鬆身心休養生息',
         breakMsg: '午休結束請洗洗臉、喝口水，準備下午課程'
       },
@@ -816,8 +807,7 @@
       { id: 'cloth-5', name: '班服', bg: '#fee2e2', text: '#b91c1c', border: '#fca5a5' },
     ];
 
-    const LOCAL_STORAGE_KEY = 'smart_classroom_schedule_data_v1';
-
+    /* Application State */
     const AppState = {
       subjects: JSON.parse(JSON.stringify(DEFAULT_SUBJECTS)),
       periods: JSON.parse(JSON.stringify(DEFAULT_PERIODS)),
@@ -841,17 +831,19 @@
       activeClothingDay: null,
       selectedClothingColor: PRESET_COLOR_PALETTES[3],
       
+      // Reminder & Warning State
       reminderSound: true,
       leadMinutes: 5,
       warningMinutes: 1,
       warningMsgHome: '請於上課鐘響前就坐，並備妥學用品，準備上課!!',
       warningMsgOutside: '請攜帶學用品於走廊集合，並於鐘響前抵達上課地點!!',
-      simulatedMode: false,
+      simulatedMode: false, // 預設使用真實時間
       simulatedDate: null,
       lastChimeTimestamp: null,
     };
 
-    let autosaveTimer = null;
+    const LOCAL_STORAGE_KEY = 'smart_schedule_app_data_v2';
+
     function saveToLocalStorage() {
       try {
         const payload = {
@@ -862,52 +854,40 @@
           clothingTypes: AppState.clothingTypes,
           clothing: AppState.clothing,
           grid: AppState.grid,
-          warningMsgHome: AppState.warningMsgHome,
-          warningMsgOutside: AppState.warningMsgOutside,
           leadMinutes: AppState.leadMinutes,
           warningMinutes: AppState.warningMinutes,
+          warningMsgHome: AppState.warningMsgHome,
+          warningMsgOutside: AppState.warningMsgOutside,
           reminderSound: AppState.reminderSound
         };
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
-        
-        // Show gentle toast feedback
-        const toast = document.getElementById('autosave-toast');
-        if (toast) {
-          clearTimeout(autosaveTimer);
-          toast.classList.remove('opacity-0', 'translate-y-2');
-          toast.classList.add('opacity-100', 'translate-y-0');
-          autosaveTimer = setTimeout(() => {
-            toast.classList.remove('opacity-100', 'translate-y-0');
-            toast.classList.add('opacity-0', 'translate-y-2');
-          }, 1500);
-        }
-      } catch (e) {
-        console.warn('LocalStorage save error:', e);
+      } catch (err) {
+        console.warn('自動儲存至 LocalStorage 失敗:', err);
       }
     }
 
     function loadFromLocalStorage() {
       try {
-        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (!saved) return false;
-        const data = JSON.parse(saved);
-        if (data && typeof data === 'object') {
-          if (Array.isArray(data.subjects) && data.subjects.length > 0) AppState.subjects = data.subjects;
-          if (Array.isArray(data.periods) && data.periods.length > 0) AppState.periods = data.periods;
-          if (data.scheduleTitle) AppState.scheduleTitle = data.scheduleTitle;
-          if (data.scheduleSubtitle !== undefined) AppState.scheduleSubtitle = data.scheduleSubtitle;
-          if (Array.isArray(data.clothingTypes) && data.clothingTypes.length > 0) AppState.clothingTypes = data.clothingTypes;
-          if (data.clothing) AppState.clothing = data.clothing;
-          if (data.grid) AppState.grid = data.grid;
-          if (data.warningMsgHome) AppState.warningMsgHome = data.warningMsgHome;
-          if (data.warningMsgOutside) AppState.warningMsgOutside = data.warningMsgOutside;
-          if (data.leadMinutes) AppState.leadMinutes = data.leadMinutes;
-          if (data.warningMinutes) AppState.warningMinutes = data.warningMinutes;
-          if (data.reminderSound !== undefined) AppState.reminderSound = data.reminderSound;
+        const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (!raw) return false;
+        const saved = JSON.parse(raw);
+        if (saved) {
+          if (Array.isArray(saved.subjects)) AppState.subjects = saved.subjects;
+          if (Array.isArray(saved.periods)) AppState.periods = saved.periods;
+          if (saved.scheduleTitle) AppState.scheduleTitle = saved.scheduleTitle;
+          if (saved.scheduleSubtitle) AppState.scheduleSubtitle = saved.scheduleSubtitle;
+          if (Array.isArray(saved.clothingTypes)) AppState.clothingTypes = saved.clothingTypes;
+          if (saved.clothing && typeof saved.clothing === 'object') AppState.clothing = saved.clothing;
+          if (saved.grid && typeof saved.grid === 'object') AppState.grid = saved.grid;
+          if (saved.leadMinutes !== undefined) AppState.leadMinutes = saved.leadMinutes;
+          if (saved.warningMinutes !== undefined) AppState.warningMinutes = saved.warningMinutes;
+          if (saved.warningMsgHome) AppState.warningMsgHome = saved.warningMsgHome;
+          if (saved.warningMsgOutside) AppState.warningMsgOutside = saved.warningMsgOutside;
+          if (saved.reminderSound !== undefined) AppState.reminderSound = saved.reminderSound;
           return true;
         }
-      } catch (e) {
-        console.error('LocalStorage load failed:', e);
+      } catch (err) {
+        console.error('從 LocalStorage 讀取資料失敗:', err);
       }
       return false;
     }
@@ -984,10 +964,10 @@
           <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold border" style="background-color: ${AppState.currentSelectedSubject.bg}; color: ${AppState.currentSelectedSubject.text}; border-color: ${AppState.currentSelectedSubject.border}">
             ${AppState.currentSelectedSubject.name}
           </span>
-          <span class="text-slate-500 font-medium text-xs">(點擊課表格子放入)</span>
+          <span class="text-slate-500 font-medium text-xs">(點擊課表格子放入；再次點擊領域卡片可取消選取)</span>
         `;
       } else {
-        badgeContainer.innerHTML = `<span class="text-slate-400">尚未選擇（點擊下方領域卡片）</span>`;
+        badgeContainer.innerHTML = `<span class="text-slate-400">尚未選擇（點擊下方卡片；或直接點擊「+」切換放學）</span>`;
       }
     }
 
@@ -996,8 +976,8 @@
       if (AppState.currentSelectedSubject && AppState.currentSelectedSubject.id === subjectId) {
         AppState.currentSelectedSubject = null;
       }
-      renderSubjectPalette();
       saveToLocalStorage();
+      renderSubjectPalette();
     }
 
     function renderScheduleGrid() {
@@ -1090,8 +1070,8 @@
           cellTd.className = 'py-2 px-1.5 sm:px-2 border-r border-slate-100 last:border-r-0 h-16 align-middle relative transition-colors cursor-pointer';
           cellTd.dataset.cellKey = cellKey;
 
-          // Special: Lunch & Nap Periods (Both stay blank and not fillable)
-          if (period.id === 'p-lunch' || period.id === 'p-nap' || period.type === 'break') {
+          // Special: Lunch Period (僅午餐時間留白不填寫課程，午休時間開放彈性排課)
+          if (period.id === 'p-lunch') {
             const blankTd = document.createElement('td');
             blankTd.className = 'py-2 px-1.5 sm:px-2 border-r border-slate-100 last:border-r-0 h-12 bg-slate-50/40 select-none';
             tr.appendChild(blankTd);
@@ -1127,11 +1107,22 @@
             continue;
           }
 
-          // Standard Class Subject Cell
+          // Schedulable Class Periods (包含午休時間與各節課程)
           const currentSubjectName = currentVal;
           const matchedSubject = AppState.subjects.find(s => s.name === currentSubjectName);
 
-          if (currentSubjectName && matchedSubject) {
+          // 1. 已切換為「放學」狀態
+          if (currentSubjectName === '放學') {
+            cellTd.innerHTML = `
+              <div title="已設定放學（點擊還原為可排課狀態）" class="schedule-badge-outer bg-slate-100/90 border-slate-300 shadow-xs hover:bg-slate-200 transition-transform hover:scale-95 cursor-pointer" style="height: 42px;">
+                <div class="schedule-badge-inner text-slate-500 font-bold">
+                  🏠 放學
+                </div>
+              </div>
+            `;
+          }
+          // 2. 已排定一般學科課程
+          else if (currentSubjectName && matchedSubject) {
             cellTd.innerHTML = `
               <div title="點擊清除" class="schedule-badge-outer shadow-xs transition-transform hover:scale-95 cursor-pointer"
                    style="background-color: ${matchedSubject.bg}; border-color: ${matchedSubject.border}; height: 42px;">
@@ -1148,27 +1139,71 @@
                 </div>
               </div>
             `;
-          } else {
+          }
+          // 3. 空白未排課（+ 狀態）
+          else {
+            const isNapPeriod = period.id === 'p-nap';
             cellTd.innerHTML = `
-              <div class="w-full max-w-[110px] mx-auto h-[42px] flex items-center justify-center text-slate-200 hover:text-slate-400 text-lg font-light select-none">
-                +
+              <div class="w-full max-w-[110px] mx-auto h-[42px] flex flex-col items-center justify-center text-slate-300 hover:text-indigo-500 font-light select-none transition-colors" title="${isNapPeriod ? '未排課預設為午休；點擊切換放學或排入課程' : '點擊切換放學；或選取領域排入課程'}">
+                <span class="text-base leading-none font-bold">+</span>
+                ${isNapPeriod ? '<span class="text-[10px] scale-90 text-slate-400 font-normal leading-none mt-0.5">預設午休</span>' : ''}
               </div>
             `;
           }
 
+          // 點擊事件處理邏輯
           cellTd.addEventListener('click', () => {
-            if (AppState.currentSelectedSubject) {
-              AppState.grid[cellKey] = AppState.currentSelectedSubject.name;
-            } else {
-              if (AppState.grid[cellKey]) {
-                delete AppState.grid[cellKey];
+            // A. 當前為「已排定課程」：清除課程，回復至「+」狀態（不開啟切換放學功能）
+            if (currentVal && currentVal !== '放學') {
+              delete AppState.grid[cellKey];
+              saveToLocalStorage();
+              renderScheduleGrid();
+              return;
+            }
+
+            // B. 當前為「放學」狀態：點擊還原為「+」，並連動還原其後所有放學時段
+            if (currentVal === '放學') {
+              const schedulablePeriods = AppState.periods.filter(p => p.id !== 'p-lunch');
+              const currIdx = schedulablePeriods.findIndex(p => p.id === period.id);
+              if (currIdx !== -1) {
+                for (let i = currIdx; i < schedulablePeriods.length; i++) {
+                  const targetKey = `${schedulablePeriods[i].id}-${day}`;
+                  if (AppState.grid[targetKey] === '放學') {
+                    delete AppState.grid[targetKey];
+                  }
+                }
+              }
+              saveToLocalStorage();
+              renderScheduleGrid();
+              return;
+            }
+
+            // C. 當前為空「+」狀態
+            if (!currentVal) {
+              // 若有選取領域：置入課程
+              if (AppState.currentSelectedSubject) {
+                AppState.grid[cellKey] = AppState.currentSelectedSubject.name;
+                saveToLocalStorage();
+                renderScheduleGrid();
+              }
+              // 若未選取領域：切換為「放學」，並連動其後所有時段變成「放學」
+              else {
+                const schedulablePeriods = AppState.periods.filter(p => p.id !== 'p-lunch');
+                const currIdx = schedulablePeriods.findIndex(p => p.id === period.id);
+                if (currIdx !== -1) {
+                  for (let i = currIdx; i < schedulablePeriods.length; i++) {
+                    const targetKey = `${schedulablePeriods[i].id}-${day}`;
+                    AppState.grid[targetKey] = '放學';
+                  }
+                }
+                saveToLocalStorage();
+                renderScheduleGrid();
               }
             }
-            renderScheduleGrid();
-            saveToLocalStorage();
           });
 
           cellTd.addEventListener('dragover', (e) => {
+            if (currentVal === '放學') return;
             e.preventDefault();
             cellTd.classList.add('drag-over');
           });
@@ -1176,14 +1211,15 @@
             cellTd.classList.remove('drag-over');
           });
           cellTd.addEventListener('drop', (e) => {
+            if (currentVal === '放學') return;
             e.preventDefault();
             cellTd.classList.remove('drag-over');
             try {
               const data = JSON.parse(e.dataTransfer.getData('text/plain'));
               if (data && data.name) {
                 AppState.grid[cellKey] = data.name;
-                renderScheduleGrid();
                 saveToLocalStorage();
+                renderScheduleGrid();
               }
             } catch (err) {
               console.error(err);
@@ -1264,9 +1300,9 @@
         btn.onclick = () => {
           if (AppState.activeClothingDay) {
             AppState.clothing[AppState.activeClothingDay] = c.name;
+            saveToLocalStorage();
             renderScheduleGrid();
             closeClothingPicker();
-            saveToLocalStorage();
           }
         };
         container.appendChild(btn);
@@ -1302,9 +1338,9 @@
         const nameInput = row.querySelector('.edit-clothing-name');
         nameInput.addEventListener('change', (e) => {
           cloth.name = e.target.value.trim() || cloth.name;
+          saveToLocalStorage();
           renderClothingOptions();
           renderScheduleGrid();
-          saveToLocalStorage();
         });
 
         const colorSelect = row.querySelector('.edit-clothing-color-select');
@@ -1314,20 +1350,20 @@
             cloth.bg = selected.bg;
             cloth.text = selected.text;
             cloth.border = selected.border;
+            saveToLocalStorage();
             renderClothingManageList();
             renderClothingOptions();
             renderScheduleGrid();
-            saveToLocalStorage();
           }
         });
 
         const deleteBtn = row.querySelector('.btn-delete-clothing');
         deleteBtn.addEventListener('click', () => {
           AppState.clothingTypes = AppState.clothingTypes.filter(c => c.id !== cloth.id);
+          saveToLocalStorage();
           renderClothingManageList();
           renderClothingOptions();
           renderScheduleGrid();
-          saveToLocalStorage();
         });
 
         listContainer.appendChild(row);
@@ -1439,8 +1475,8 @@
           AppState.periods[i].breakMsg = breakInput.value.trim() || '下課請喝水、上廁所，讓眼睛好好休息一下';
         }
       }
-      renderScheduleGrid();
       saveToLocalStorage();
+      renderScheduleGrid();
       const modal = document.getElementById('modal-periods');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
@@ -1674,78 +1710,127 @@
       const lastPeriod = periodsSorted[periodsSorted.length - 1];
       const lastPeriodEndSec = parseTimeToSeconds(lastPeriod.endTime);
 
-      if (!currentPeriod && !nextPeriod && currentTimeInSecs >= lastPeriodEndSec) {
+      // 檢查是否已提早全日放學 (若當前時段或後續所有排定課程皆已設為「放學」)
+      let isAlreadyDismissed = false;
+      if (currentPeriod) {
+        const curKey = `${currentPeriod.id}-${currentDay}`;
+        if (AppState.grid[curKey] === '放學') {
+          isAlreadyDismissed = true;
+        }
+      } else if (nextPeriod) {
+        const nextIdx = periodsSorted.findIndex(p => p.id === nextPeriod.id);
+        const remainingAllDismissed = periodsSorted.slice(nextIdx).every(p => {
+          if (p.id === 'p-lunch') return true;
+          return AppState.grid[`${p.id}-${currentDay}`] === '放學';
+        });
+        if (remainingAllDismissed) {
+          isAlreadyDismissed = true;
+        }
+      }
+
+      if (isAlreadyDismissed || (!currentPeriod && !nextPeriod && currentTimeInSecs >= lastPeriodEndSec)) {
         container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
         container.innerHTML = `
           <div class="py-6">
             <div class="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i data-lucide="check-circle" class="w-8 h-8"></i>
+              <i data-lucide="home" class="w-8 h-8"></i>
             </div>
-            <h3 class="text-2xl font-bold text-slate-100 mb-2">今日課程已圓滿結束！</h3>
-            <p class="text-slate-400 text-sm">請檢查聯絡簿與作業是否都已收妥，安心放學返家，期待明天再見！</p>
+            <h3 class="text-2xl sm:text-3xl font-bold text-slate-100 mb-2">今日課程已圓滿結束（已放學）！</h3>
+            <p class="text-slate-400 text-sm">請檢查聯絡簿與作業是否都已收妥，整理好書包，安心平安返家！</p>
           </div>
         `;
         if (window.lucide) lucide.createIcons();
         return;
       }
 
-      // SCENARIO 1: Lunch or Nap In-progress Break
-      if (currentPeriod && (currentPeriod.type === 'break' || currentPeriod.id === 'p-lunch' || currentPeriod.id === 'p-nap')) {
-        const leadSecLimit = AppState.leadMinutes * 60;
+      // SCENARIO 1: Lunch Break
+      if (currentPeriod && currentPeriod.id === 'p-lunch') {
         const pEndSec = parseTimeToSeconds(currentPeriod.endTime);
         const secsUntilNext = pEndSec - currentTimeInSecs;
+        const startSec = parseTimeToSeconds(currentPeriod.startTime);
+        const totalDuration = pEndSec - startSec;
+        const elapsed = currentTimeInSecs - startSec;
+        const progressPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
+        const remainMins = Math.ceil(secsUntilNext / 60);
 
-        if (secsUntilNext > leadSecLimit || !nextPeriod) {
-          const startSec = parseTimeToSeconds(currentPeriod.startTime);
-          const totalDuration = pEndSec - startSec;
-          const elapsed = currentTimeInSecs - startSec;
-          const progressPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
-          const remainMins = Math.ceil(secsUntilNext / 60);
+        container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
+        container.innerHTML = `
+          <div class="flex flex-col items-center">
+            <div class="inline-flex items-center space-x-2.5 px-5 py-2 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-sm font-bold mb-4 shadow-sm">
+              <i data-lucide="utensils" class="w-4 h-4 text-emerald-400"></i>
+              <span>${currentPeriod.name}</span>
+            </div>
 
-          const isLunch = currentPeriod.id === 'p-lunch';
-          const badgeIcon = isLunch ? 'utensils' : 'moon';
-          const badgeColor = isLunch ? 'emerald' : 'indigo';
-          const mainTitle = isLunch ? '用餐與餐後潔牙' : '安靜午休養精蓄銳';
-          const defaultMsg = isLunch ? '用餐細嚼慢嚥，落實餐後潔牙與整理' : '午休請保持安靜，放鬆身心休養生息';
-          const remainLabel = isLunch ? '距離潔牙/午休還有：' : '距離下午上課還有：';
+            <div class="text-slate-400 text-sm mb-1">${currentPeriod.name} (${currentPeriod.startTime} - ${currentPeriod.endTime})</div>
+            <h3 class="text-4xl sm:text-5xl font-black text-white tracking-wide mb-4">用餐與餐後潔牙</h3>
 
-          container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
-          container.innerHTML = `
-            <div class="flex flex-col items-center">
-              <div class="inline-flex items-center space-x-2.5 px-5 py-2 rounded-full bg-${badgeColor}-950/80 border border-${badgeColor}-500/40 text-${badgeColor}-300 text-sm font-bold mb-4 shadow-sm">
-                <i data-lucide="${badgeIcon}" class="w-4 h-4 text-${badgeColor}-400"></i>
-                <span>${currentPeriod.name}</span>
+            <div class="flex items-center justify-center space-x-3 text-slate-100 text-base sm:text-xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-6 shadow-md">
+              <i data-lucide="sparkles" class="w-5 h-5 text-amber-400 shrink-0"></i>
+              <span class="text-slate-200 font-semibold">${currentPeriod.inClassMsg || '用餐細嚼慢嚥，落實餐後潔牙與整理'}</span>
+            </div>
+
+            <div class="w-full max-w-md bg-slate-800/60 p-4 rounded-2xl border border-slate-800">
+              <div class="flex justify-between text-xs text-slate-400 mb-2">
+                <span>距離潔牙/午休還有：<strong class="text-amber-300 font-bold font-mono text-sm">${remainMins} 分鐘</strong></span>
+                <span>進度 ${progressPercent}%</span>
               </div>
-
-              <div class="text-slate-400 text-sm mb-1">${currentPeriod.name} (${currentPeriod.startTime} - ${currentPeriod.endTime})</div>
-              <h3 class="text-4xl sm:text-5xl font-black text-white tracking-wide mb-4">${mainTitle}</h3>
-
-              <div class="flex items-center justify-center space-x-3 text-slate-100 text-base sm:text-xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-6 shadow-md">
-                <i data-lucide="sparkles" class="w-5 h-5 text-amber-400 shrink-0"></i>
-                <span class="text-slate-200 font-semibold">${currentPeriod.inClassMsg || defaultMsg}</span>
-              </div>
-
-              <div class="w-full max-w-md bg-slate-800/60 p-4 rounded-2xl border border-slate-800">
-                <div class="flex justify-between text-xs text-slate-400 mb-2">
-                  <span>${remainLabel}<strong class="text-amber-300 font-bold font-mono text-sm">${remainMins} 分鐘</strong></span>
-                  <span>進度 ${progressPercent}%</span>
-                </div>
-                <div class="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden">
-                  <div class="bg-gradient-to-r from-${badgeColor}-500 to-teal-400 h-full rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
-                </div>
+              <div class="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
               </div>
             </div>
-          `;
-          if (window.lucide) lucide.createIcons();
-          return;
-        }
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
       }
 
-      // SCENARIO 2: In Class
+      // SCENARIO 2: Nap Time (若未設定課程，視為預設午休；若已排課，則下方按一般上課進行)
+      const napVal = AppState.grid[`p-nap-${currentDay}`];
+      if (currentPeriod && currentPeriod.id === 'p-nap' && !napVal) {
+        const pEndSec = parseTimeToSeconds(currentPeriod.endTime);
+        const secsUntilNext = pEndSec - currentTimeInSecs;
+        const startSec = parseTimeToSeconds(currentPeriod.startTime);
+        const totalDuration = pEndSec - startSec;
+        const elapsed = currentTimeInSecs - startSec;
+        const progressPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
+        const remainMins = Math.ceil(secsUntilNext / 60);
+
+        container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
+        container.innerHTML = `
+          <div class="flex flex-col items-center">
+            <div class="inline-flex items-center space-x-2.5 px-5 py-2 rounded-full bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 text-sm font-bold mb-4 shadow-sm">
+              <i data-lucide="moon" class="w-4 h-4 text-indigo-400"></i>
+              <span>${currentPeriod.name}</span>
+            </div>
+
+            <div class="text-slate-400 text-sm mb-1">${currentPeriod.name} (${currentPeriod.startTime} - ${currentPeriod.endTime})</div>
+            <h3 class="text-4xl sm:text-5xl font-black text-white tracking-wide mb-4">安靜午休養精蓄銳</h3>
+
+            <div class="flex items-center justify-center space-x-3 text-slate-100 text-base sm:text-xl font-bold bg-slate-800/90 px-6 py-3 rounded-2xl border border-slate-700/80 mb-6 shadow-md">
+              <i data-lucide="sparkles" class="w-5 h-5 text-amber-400 shrink-0"></i>
+              <span class="text-slate-200 font-semibold">${currentPeriod.inClassMsg || '午休請保持安靜，放鬆身心休養生息'}</span>
+            </div>
+
+            <div class="w-full max-w-md bg-slate-800/60 p-4 rounded-2xl border border-slate-800">
+              <div class="flex justify-between text-xs text-slate-400 mb-2">
+                <span>距離下午上課還有：<strong class="text-amber-300 font-bold font-mono text-sm">${remainMins} 分鐘</strong></span>
+                <span>進度 ${progressPercent}%</span>
+              </div>
+              <div class="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                <div class="bg-gradient-to-r from-indigo-500 to-purple-400 h-full rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      // SCENARIO 3: In Class (若午休時間排入課程，也會在此正常顯示)
       if (currentPeriod && currentPeriod.type !== 'break') {
         container.className = 'w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl transition-all duration-500';
         const cellKey = `${currentPeriod.id}-${currentDay}`;
-        const subjectName = AppState.grid[cellKey] || '自習 / 彈性';
+        const subjectName = AppState.grid[cellKey] || (currentPeriod.id === 'p-nap' ? '午休時間' : '自習 / 彈性');
         const matchedSubject = AppState.subjects.find(s => s.name === subjectName);
         
         const startSec = parseTimeToSeconds(currentPeriod.startTime);
@@ -1786,12 +1871,13 @@
         return;
       }
 
-      // SCENARIO 3: Recess, Pre-class Notice, or Red Alert
+      // SCENARIO 4: Recess, Pre-class Notice, or Red Alert
       if (nextPeriod) {
-        const isNextNap = nextPeriod.id === 'p-nap';
         const cellKey = `${nextPeriod.id}-${currentDay}`;
-        const nextSubjectName = isNextNap ? (nextPeriod.name || '午休時間') : (AppState.grid[cellKey] || '自習 / 彈性');
-        const matchedSubject = isNextNap ? null : AppState.subjects.find(s => s.name === nextSubjectName);
+        const configuredNextVal = AppState.grid[cellKey];
+        const isNextNap = nextPeriod.id === 'p-nap' && !configuredNextVal;
+        const nextSubjectName = configuredNextVal || (nextPeriod.id === 'p-nap' ? '午休時間' : '自習 / 彈性');
+        const matchedSubject = AppState.subjects.find(s => s.name === nextSubjectName);
         const classroom = matchedSubject ? matchedSubject.room : '原班教室';
 
         const leadSecLimit = AppState.leadMinutes * 60;
@@ -1972,15 +2058,63 @@
     }
 
     function initApp() {
-      // 1. Prioritize restoring saved schedule from localStorage
-      loadFromLocalStorage();
+      // 1. 嘗試載入 LocalStorage 歷史儲存資料
+      const hasLocalData = loadFromLocalStorage();
+
+      // 2. 強制校準最新地點規範
+      const updatedRooms = {
+        '體育': '操場 / 籃球場',
+        '音樂': '社會教室',
+        '社團': '各社團上課地點',
+        '律動': '多功能教室',
+        '本土': '英語教室',
+        '閱讀': '原班教室'
+      };
+      AppState.subjects.forEach(sub => {
+        if (updatedRooms[sub.name]) {
+          sub.room = updatedRooms[sub.name];
+        }
+      });
+
+      // 3. 強制校準最新 5 項上課中提示語規範
+      const updatedInMsgs = {
+        '國語': '認真朗讀課文，用心學習，踴躍舉手發表',
+        '數學': '用心學習，仔細計算，有問題時舉手發問',
+        '自然': '遵守課堂規則用心學習，參與實驗時細心觀察',
+        '社會': '遵守課堂規則用心學習，並積極參與互動',
+        '資訊': '愛惜電腦設備，遵守上課規則，不隨意瀏覽非學習網頁'
+      };
+      AppState.subjects.forEach(sub => {
+        if (updatedInMsgs[sub.name]) {
+          sub.inMsg = updatedInMsgs[sub.name];
+        }
+      });
+
+      // 4. 確保健康領域存在
+      if (!AppState.subjects.find(s => s.name === '健康')) {
+        const hColor = PRESET_COLOR_PALETTES[0];
+        AppState.subjects.push({
+          id: 'sub-health',
+          name: '健康',
+          bg: hColor.bg,
+          text: hColor.text,
+          border: hColor.border,
+          room: '原班教室',
+          preMsg: '請準備健康課本與上課所需文具',
+          inMsg: '學習身心健康觀念，培養良好生活好習慣'
+        });
+      }
+
+      // 5. 確保午休時間可排課 (type: 'class')
+      const napObj = AppState.periods.find(p => p.id === 'p-nap');
+      if (napObj) napObj.type = 'class';
 
       renderSubjectPalette();
       renderScheduleGrid();
       initClothingColorPalettes();
       initColorPickerGroup();
 
-      // Titles input sync
+      // 標題連動與儲存
       const titleInput = document.getElementById('input-schedule-title');
       const subtitleInput = document.getElementById('input-schedule-subtitle');
       const titleDisplay = document.getElementById('display-schedule-title');
@@ -2003,16 +2137,16 @@
         saveToLocalStorage();
       });
 
-      // Clear Grid Button
+      // 清空課表
       document.getElementById('btn-clear-grid').addEventListener('click', () => {
         showConfirmDialog('清空課表確認', '確定要清空課表內的所有課程與活動填寫嗎？', () => {
           AppState.grid = {};
-          renderScheduleGrid();
           saveToLocalStorage();
+          renderScheduleGrid();
         });
       });
 
-      // Export JSON Button
+      // 匯出 JSON
       document.getElementById('btn-export-json').addEventListener('click', () => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(AppState, null, 2));
         const dlAnchor = document.createElement('a');
@@ -2023,7 +2157,7 @@
         dlAnchor.remove();
       });
 
-      // Import JSON Triggers
+      // 匯入 JSON
       const inputImport = document.getElementById('input-import-json');
       document.getElementById('btn-trigger-import').addEventListener('click', () => {
         inputImport.click();
@@ -2053,11 +2187,11 @@
                 titleDisplay.innerText = AppState.scheduleTitle;
                 subtitleDisplay.innerText = AppState.scheduleSubtitle;
 
+                saveToLocalStorage();
                 renderSubjectPalette();
                 renderScheduleGrid();
                 renderClothingOptions();
                 initClothingColorPalettes();
-                saveToLocalStorage();
               });
             }
           } catch (err) {
@@ -2068,7 +2202,7 @@
         reader.readAsText(file);
       });
 
-      // Export PNG with Absolute Geometry & Baseline Compensation
+      // 匯出 PNG
       document.getElementById('btn-export-png').addEventListener('click', async () => {
         const target = document.getElementById('schedule-export-wrapper');
         const btn = document.getElementById('btn-export-png');
@@ -2165,7 +2299,15 @@
             allTds.forEach(td => {
               td.style.verticalAlign = 'middle';
               const textOnly = td.textContent.trim();
-              if (textOnly === '+' || textOnly === '+ 選穿著') {
+              if (
+                textOnly === '+' ||
+                textOnly === '+ 選穿著' ||
+                textOnly.includes('預設午休') ||
+                textOnly.includes('放學') ||
+                td.querySelector('.cell-dismissal-badge') ||
+                td.querySelector('.cell-placeholder-hint') ||
+                td.querySelector('.clothing-placeholder-badge')
+              ) {
                 td.innerHTML = '';
               }
             });
@@ -2184,16 +2326,16 @@
         });
       });
 
-      // Reset Subjects
+      // 還原預設領域
       document.getElementById('btn-reset-subjects').addEventListener('click', () => {
         showConfirmDialog('還原預設領域', '確定要將領域清單恢復為系統預設項目嗎？', () => {
           AppState.subjects = JSON.parse(JSON.stringify(DEFAULT_SUBJECTS));
-          renderSubjectPalette();
           saveToLocalStorage();
+          renderSubjectPalette();
         });
       });
 
-      // Toggle Delete Subject Mode
+      // 切換刪除領域模式
       const deleteModeBtn = document.getElementById('btn-toggle-delete-mode');
       const deleteModeText = document.getElementById('delete-mode-text');
       deleteModeBtn.addEventListener('click', () => {
@@ -2210,7 +2352,7 @@
         renderSubjectPalette();
       });
 
-      // Add Subject Modal
+      // 自訂新領域 Modal
       const modalAddSubject = document.getElementById('modal-add-subject');
       document.getElementById('btn-open-add-subject').addEventListener('click', () => {
         modalAddSubject.classList.remove('hidden');
@@ -2241,13 +2383,13 @@
           preMsg: `請攜帶 ${name} 課本、學用品及水壺前往！`,
           inMsg: '請保持安靜，認真聽講並主動思考'
         });
-        renderSubjectPalette();
         saveToLocalStorage();
+        renderSubjectPalette();
         modalAddSubject.classList.add('hidden');
         modalAddSubject.classList.remove('flex');
       });
 
-      // Periods Modal
+      // 編輯時段 Modal
       const modalPeriods = document.getElementById('modal-periods');
       document.getElementById('btn-open-periods-modal').addEventListener('click', () => {
         renderPeriodsEditor();
@@ -2262,13 +2404,13 @@
       document.getElementById('btn-reset-periods-default').addEventListener('click', () => {
         showConfirmDialog('還原預設時段', '確定恢復為預設時段時間與提醒語？', () => {
           AppState.periods = JSON.parse(JSON.stringify(DEFAULT_PERIODS));
+          saveToLocalStorage();
           renderPeriodsEditor();
           renderScheduleGrid();
-          saveToLocalStorage();
         });
       });
 
-      // Classrooms Modal
+      // 科任教室 Modal
       const modalClassrooms = document.getElementById('modal-classrooms');
       const btnOpenClassroom = document.getElementById('btn-open-classroom-modal');
       const btnCloseClassrooms = document.getElementById('btn-close-classrooms-modal');
@@ -2295,7 +2437,7 @@
         btnSaveClassrooms.addEventListener('click', saveClassroomsFromEditor);
       }
 
-      // Subject Messages Modal
+      // 領域提示語 Modal
       const modalSubjectMessages = document.getElementById('modal-subject-messages');
       const btnOpenSubjectMessages = document.getElementById('btn-open-subject-messages-modal');
       const btnCloseSubjectMessages = document.getElementById('btn-close-subject-messages-modal');
@@ -2322,7 +2464,7 @@
         btnSaveSubjectMessages.addEventListener('click', saveSubjectMessagesFromEditor);
       }
 
-      // Warning Messages Modal
+      // 警示訊息 Modal (紅色模式)
       const modalWarningMessages = document.getElementById('modal-warning-messages');
       const btnOpenWarningMessages = document.getElementById('btn-open-warning-messages-modal');
       const btnCloseWarningMessages = document.getElementById('btn-close-warning-messages-modal');
@@ -2368,7 +2510,7 @@
         });
       }
 
-      // Clothing Modal
+      // 服裝管理
       const btnSubmitClothing = document.getElementById('btn-submit-clothing-form');
       if (btnSubmitClothing) {
         btnSubmitClothing.onclick = () => {
@@ -2385,10 +2527,10 @@
           });
 
           input.value = '';
+          saveToLocalStorage();
           renderClothingManageList();
           renderClothingOptions();
           renderScheduleGrid();
-          saveToLocalStorage();
         };
       }
 
@@ -2397,10 +2539,10 @@
         btnResetClothing.onclick = () => {
           showConfirmDialog('還原預設服裝', '確定恢復為預設服裝選項（制服、運動服、校服、便服、班服）？', () => {
             AppState.clothingTypes = JSON.parse(JSON.stringify(DEFAULT_CLOTHING_TYPES));
+            saveToLocalStorage();
             renderClothingManageList();
             renderClothingOptions();
             renderScheduleGrid();
-            saveToLocalStorage();
           });
         };
       }
@@ -2416,17 +2558,36 @@
         btnClearClothing.onclick = () => {
           if (AppState.activeClothingDay) {
             delete AppState.clothing[AppState.activeClothingDay];
+            saveToLocalStorage();
             renderScheduleGrid();
             closeClothingPicker();
-            saveToLocalStorage();
           }
         };
       }
 
-      // Reminder Board Controls
+      // 提醒看板控制項
       const reminderOverlay = document.getElementById('reminder-board-overlay');
+      const simBar = document.getElementById('sim-controls-bar');
+      const btnSimToggle = document.getElementById('btn-toggle-sim-bar');
+      const simBtnIcon = document.getElementById('sim-btn-icon');
+      const simBtnText = document.getElementById('sim-btn-text');
+
+      function updateSimButtonState(isOpen) {
+        if (!simBtnIcon || !btnSimToggle || !simBtnText) return;
+        if (isOpen) {
+          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 border border-indigo-400 text-white rounded-lg transition-all cursor-pointer shadow-md shadow-indigo-900/40 whitespace-nowrap';
+          simBtnIcon.className = 'w-3.5 h-3.5 text-amber-300';
+          simBtnText.innerText = '模擬測試中';
+        } else {
+          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer whitespace-nowrap';
+          simBtnIcon.className = 'w-3.5 h-3.5 text-slate-400';
+          simBtnText.innerText = '模擬測試';
+        }
+      }
+
       document.getElementById('btn-open-reminder').addEventListener('click', () => {
         reminderOverlay.classList.remove('hidden');
+        // 預設進入為真實時間模式，收合模擬工具列
         AppState.simulatedMode = false;
         AppState.simulatedDate = null;
         if (simBar) simBar.classList.add('hidden');
@@ -2442,7 +2603,7 @@
         }
       });
 
-      // Distraction-Free Minimal Mode Handlers
+      // 純淨看板模式 (Minimal Mode)
       const btnToggleMinimal = document.getElementById('btn-toggle-minimal-mode');
       const btnExitMinimalFloat = document.getElementById('btn-exit-minimal-float');
       const btnCloseReminderFloat = document.getElementById('btn-close-reminder-float');
@@ -2456,17 +2617,11 @@
       };
 
       if (btnToggleMinimal) {
-        btnToggleMinimal.addEventListener('click', () => {
-          setMinimalMode(true);
-        });
+        btnToggleMinimal.addEventListener('click', () => setMinimalMode(true));
       }
-
       if (btnExitMinimalFloat) {
-        btnExitMinimalFloat.addEventListener('click', () => {
-          setMinimalMode(false);
-        });
+        btnExitMinimalFloat.addEventListener('click', () => setMinimalMode(false));
       }
-
       if (btnCloseReminderFloat) {
         btnCloseReminderFloat.addEventListener('click', () => {
           setMinimalMode(false);
@@ -2512,6 +2667,7 @@
           toneStarted = true;
         }
         AppState.reminderSound = !AppState.reminderSound;
+        saveToLocalStorage();
         if (AppState.reminderSound) {
           soundIcon.className = 'w-4 h-4 text-emerald-400';
           soundText.innerText = '提醒音：開';
@@ -2520,10 +2676,9 @@
           soundIcon.className = 'w-4 h-4 text-slate-500';
           soundText.innerText = '提醒音：關';
         }
-        saveToLocalStorage();
       });
 
-      // Lead minutes select & custom input
+      // 首次提醒時間下拉選單
       const selectLead = document.getElementById('select-lead-minutes');
       const inputCustomLead = document.getElementById('input-custom-lead-minutes');
       selectLead.value = String(AppState.leadMinutes);
@@ -2548,11 +2703,11 @@
         }
       });
 
-      // Warning minutes select & custom input
+      // 警示時間下拉選單
       const selectWarning = document.getElementById('select-warning-minutes');
       const inputCustomWarning = document.getElementById('input-custom-warning-minutes');
       if (selectWarning && inputCustomWarning) {
-        selectWarning.value = String(AppState.warningMinutes);
+        selectWarning.value = String(AppState.warningMinutes || 1);
         selectWarning.addEventListener('change', (e) => {
           if (e.target.value === 'custom') {
             inputCustomWarning.classList.remove('hidden');
@@ -2575,29 +2730,11 @@
         });
       }
 
-      const simBar = document.getElementById('sim-controls-bar');
-      const btnSimToggle = document.getElementById('btn-toggle-sim-bar');
-      const simBtnIcon = document.getElementById('sim-btn-icon');
-      const simBtnText = document.getElementById('sim-btn-text');
-
-      function updateSimButtonState(isOpen) {
-        if (!simBtnIcon || !btnSimToggle || !simBtnText) return;
-        if (isOpen) {
-          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 border border-indigo-400 text-white rounded-lg transition-all cursor-pointer shadow-md shadow-indigo-900/40';
-          simBtnIcon.className = 'w-3.5 h-3.5 text-amber-300';
-          simBtnText.innerText = '模擬測試中';
-        } else {
-          btnSimToggle.className = 'flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer';
-          simBtnIcon.className = 'w-3.5 h-3.5 text-slate-400';
-          simBtnText.innerText = '模擬測試';
-        }
-      }
-
+      // 模擬測試切換開關
       const simSelectWeekday = document.getElementById('sim-select-weekday');
       const simCustomTime = document.getElementById('sim-custom-time');
       if (simSelectWeekday) simSelectWeekday.value = "1";
       if (simCustomTime) simCustomTime.value = "09:16";
-      updateSimButtonState(false);
 
       if (btnSimToggle && simBar) {
         btnSimToggle.addEventListener('click', () => {
@@ -2630,8 +2767,8 @@
         const d = new Date();
         d.setHours(9, 16, 0);
         AppState.simulatedDate = d;
-        document.getElementById('sim-select-weekday').value = "1";
-        document.getElementById('sim-custom-time').value = "09:16";
+        if (simSelectWeekday) simSelectWeekday.value = "1";
+        if (simCustomTime) simCustomTime.value = "09:16";
         updateReminderBoard();
       });
 
@@ -2642,8 +2779,8 @@
           const d = new Date();
           d.setHours(9, 19, 15);
           AppState.simulatedDate = d;
-          document.getElementById('sim-select-weekday').value = "1";
-          document.getElementById('sim-custom-time').value = "09:19";
+          if (simSelectWeekday) simSelectWeekday.value = "1";
+          if (simCustomTime) simCustomTime.value = "09:19";
           updateReminderBoard();
         });
       }
@@ -2653,33 +2790,38 @@
         const d = new Date();
         d.setHours(9, 30, 0);
         AppState.simulatedDate = d;
-        document.getElementById('sim-select-weekday').value = "1";
-        document.getElementById('sim-custom-time').value = "09:30";
+        if (simSelectWeekday) simSelectWeekday.value = "1";
+        if (simCustomTime) simCustomTime.value = "09:30";
         updateReminderBoard();
       });
 
-      document.getElementById('sim-custom-time').addEventListener('input', (e) => {
-        const timeVal = e.target.value;
-        if (!timeVal) return;
-        AppState.simulatedMode = true;
-        const [h, m] = timeVal.split(':').map(Number);
-        const d = AppState.simulatedDate ? new Date(AppState.simulatedDate) : new Date();
-        d.setHours(h, m, 0);
-        AppState.simulatedDate = d;
-        updateReminderBoard();
-      });
+      if (simCustomTime) {
+        simCustomTime.addEventListener('input', (e) => {
+          const timeVal = e.target.value;
+          if (!timeVal) return;
+          AppState.simulatedMode = true;
+          const [h, m] = timeVal.split(':').map(Number);
+          const d = AppState.simulatedDate ? new Date(AppState.simulatedDate) : new Date();
+          d.setHours(h, m, 0);
+          AppState.simulatedDate = d;
+          updateReminderBoard();
+        });
+      }
 
-      document.getElementById('sim-select-weekday').addEventListener('change', (e) => {
-        AppState.simulatedMode = true;
-        const weekday = parseInt(e.target.value, 10);
-        const d = AppState.simulatedDate ? new Date(AppState.simulatedDate) : new Date();
-        const currentDay = d.getDay();
-        const diff = weekday - currentDay;
-        d.setDate(d.getDate() + diff);
-        AppState.simulatedDate = d;
-        updateReminderBoard();
-      });
+      if (simSelectWeekday) {
+        simSelectWeekday.addEventListener('change', (e) => {
+          AppState.simulatedMode = true;
+          const weekday = parseInt(e.target.value, 10);
+          const d = AppState.simulatedDate ? new Date(AppState.simulatedDate) : new Date();
+          const currentDay = d.getDay();
+          const diff = weekday - currentDay;
+          d.setDate(d.getDate() + diff);
+          AppState.simulatedDate = d;
+          updateReminderBoard();
+        });
+      }
 
+      // 看板主輪詢計時器
       setInterval(() => {
         if (!reminderOverlay.classList.contains('hidden')) {
           if (AppState.simulatedMode && AppState.simulatedDate) {
